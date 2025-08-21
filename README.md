@@ -1,8 +1,5 @@
 # StockSimulator_backend
 
-No problem 👍 Here’s a **clear, professional README** tailored just for your **Stock Simulator Backend (Spring Boot + JWT + MySQL)** repo:
-
----
 
 # 📈 Stock Simulator – Backend
 
