@@ -1,30 +1,21 @@
-# Use a lightweight JDK for building
-FROM eclipse-temurin:17-jdk AS build
-
-# Set working directory
+# Stage 1: Build with JDK 17 and Maven
+FROM maven:3.9.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy Maven wrapper and pom.xml
-COPY mvnw .
-COPY .mvn .mvn
+# Copy pom.xml and download dependencies
 COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Download dependencies (this step is cached unless pom.xml changes)
-RUN ./mvnw dependency:go-offline
+# Copy the entire project and build
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Copy source code
-COPY src src
-
-# Build the Spring Boot application
-RUN ./mvnw clean package -DskipTests
-
-# Use lightweight JDK for running
-FROM eclipse-temurin:21-jdk
-
+# Stage 2: Run with JDK 17 (same as build stage)
+FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
 
-# Copy the built jar from the build stage
+# Copy the built JAR from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Run the Spring Boot app
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
