@@ -1,5 +1,5 @@
 # Use a lightweight JDK for building
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:17-jdk AS build
 
 # Set working directory
 WORKDIR /app
