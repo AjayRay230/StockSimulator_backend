@@ -1,0 +1,39 @@
+
+
+services:
+  mysql:
+    image: mysql:8.0.36
+    container_name: stock-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: stocksimulator
+      MYSQL_USER: ajay
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3307:3306"
+    volumes:
+      - stocksimulator_stocksimulator_stock_mysql_data:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d   # 👈 Mount MySQL init scripts
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ajay", "-psecret"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: stock-simulator
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/stocksimulator?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ajay
+      SPRING_DATASOURCE_PASSWORD: secret
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_FLYWAY_ENABLED: "true"
+
+volumes:
+  stocksimulator_stocksimulator_stock_mysql_data:
