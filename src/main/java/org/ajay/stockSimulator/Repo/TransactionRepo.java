@@ -41,11 +41,12 @@ public interface TransactionRepo extends JpaRepository<Transaction,Long> {
     List<Object[]> findTradesExecuted();
 
     // Active Traders
-    @Query("SELECT u.userId, u.username, u.email, COUNT(t) " +
-            "FROM Transaction t JOIN t.user u " +
-            "WHERE DATE(t.timestamp) = CURRENT_DATE " +
-            "GROUP BY u.userId, u.username, u.email " +
-            "ORDER BY COUNT(t) DESC")
+    @Query(value = "SELECT u.user_id, u.username, u.email, COUNT(t.*) AS trade_count " +
+            "FROM transaction t " +
+            "JOIN users u ON t.user_id = u.user_id " +
+            "WHERE t.timestamp::date = CURRENT_DATE " +
+            "GROUP BY u.user_id, u.username, u.email " +
+            "ORDER BY trade_count DESC", nativeQuery = true)
     List<Object[]> findActiveTraders();
 
     Page<Transaction> findAllByOrderByTimestampDesc(Pageable pageable);
