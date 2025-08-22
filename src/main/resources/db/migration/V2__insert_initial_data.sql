@@ -11,7 +11,7 @@ VALUES (
        ),
        ('admin','Admin','Sir', '$2a$12$9dxWJKw16MxhaiuoL184Ou3AxxAe.VBpVUE3byIXMnuhOsycA1cIq', 'admin@example.com', 100000.00, 'ADMIN'),
 
-        ("ajayroy","AJAY","ROY", "$2a$12$lNnrPojpUGBi7ShsZEY6weo260eN6XspeYqjMUWzNuQtBpxSAH3/m","AjayRy7439@gmail.com",1000000,"ADMIN");
+        ('ajayroy','AJAY','ROY', '$2a$12$lNnrPojpUGBi7ShsZEY6weo260eN6XspeYqjMUWzNuQtBpxSAH3/m','AjayRy7439@gmail.com',1000000,'ADMIN');
 -- STOCK DATA
 INSERT INTO stock (symbol, companyname, currentprice, changepercent, lastupdate) VALUES
                                                                                      ('AAPL', 'Apple Inc.', 197.20, 1.23, CURRENT_TIMESTAMP),
