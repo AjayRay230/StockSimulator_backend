@@ -48,7 +48,6 @@ public interface TransactionRepo extends JpaRepository<Transaction,Long> {
             "GROUP BY u.user_id, u.username, u.email " +
             "ORDER BY trade_count DESC", nativeQuery = true)
     List<Object[]> findActiveTraders();
-
     Page<Transaction> findAllByOrderByTimestampDesc(Pageable pageable);
 
 
