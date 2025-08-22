@@ -57,7 +57,7 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>11.11.0</version>
+            <version>11.7.2</version>
         </dependency>
 
 
@@ -117,7 +117,7 @@
             <plugin>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-maven-plugin</artifactId>
-                <version>11.11.0</version>
+                <version>11.7.2</version>
 
             </plugin>
 			<plugin>
