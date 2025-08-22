@@ -86,7 +86,7 @@ public class UserController {
         user.setEmail(registrationRequest.getEmail());
         user.setPassword(bCryptPasswordEncoder.encode(registrationRequest.getPassword()));
         user.setAmount(registrationRequest.getAmount());
-        user.setRole(registrationRequest.getRole());
+        user.setRole("USER");
         userRepo.save(user);
         String token = jWTService.generateToken(user);
 
