@@ -35,7 +35,7 @@ public interface TransactionRepo extends JpaRepository<Transaction,Long> {
     // Trades Executed Today
     @Query(value = "SELECT stocksymbol, COUNT(*), MAX(timestamp) " +
             "FROM transaction " +
-            "WHERE DATE(timestamp) = CURRENT_DATE " +
+            "WHERE timestamp::date = CURRENT_DATE " +
             "GROUP BY stocksymbol " +
             "ORDER BY COUNT(*) DESC", nativeQuery = true)
     List<Object[]> findTradesExecuted();
