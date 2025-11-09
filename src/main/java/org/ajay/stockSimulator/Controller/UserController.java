@@ -97,7 +97,8 @@ public class UserController {
                 user.getRole(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getAmount()
         ));
     }
     @PostMapping("/login")
@@ -130,13 +131,14 @@ public class UserController {
             // Step 4: Generate token and return success
             String token = jWTService.generateToken(user);
             return ResponseEntity.ok(new AuthResponse(
-                    token,
-                   user.getUserId(),
+                                token,
+                    user.getUserId(),
                     user.getRole(),
                     user.getFirstName(),
                     user.getLastName(),
-                    user.getEmail()
-            ));
+                    user.getEmail(),
+                    user.getAmount()
+                        ));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid password");
         }
