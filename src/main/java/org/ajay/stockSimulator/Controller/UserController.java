@@ -85,7 +85,7 @@ public class UserController {
         user.setUsername(registrationRequest.getUsername());
         user.setEmail(registrationRequest.getEmail());
         user.setPassword(bCryptPasswordEncoder.encode(registrationRequest.getPassword()));
-        user.setAmount(registrationRequest.getAmount());
+        user.setAmount(new BigDecimal("10000000"));
         user.setRole("USER");
         userRepo.save(user);
         String token = jWTService.generateToken(user);
@@ -123,11 +123,11 @@ public class UserController {
                             authRequest.getPassword()
                     )
             );
-                if(user.getAmount()==null || user.getAmount().compareTo(BigDecimal.ZERO)==0)
-                {
-                    user.setAmount(new BigDecimal(10000000));
-                    userRepo.save(user);
-                }
+//                if(user.getAmount()==null || user.getAmount().compareTo(BigDecimal.ZERO)==0)
+//                {
+//                    user.setAmount(new BigDecimal(10000000));
+//                    userRepo.save(user);
+//                }
             // Step 4: Generate token and return success
             String token = jWTService.generateToken(user);
             return ResponseEntity.ok(new AuthResponse(
