@@ -4,8 +4,11 @@ import org.ajay.stockSimulator.DTOs.AuthRequest;
 import org.ajay.stockSimulator.DTOs.AuthResponse;
 import org.ajay.stockSimulator.DTOs.RegistrationRequest;
 import org.ajay.stockSimulator.Repo.UserRepo;
+import org.ajay.stockSimulator.model.PasswordResetToken;
 import org.ajay.stockSimulator.model.User;
 import org.ajay.stockSimulator.service.JWTService;
+
+import org.ajay.stockSimulator.service.PasswordResetService;
 import org.ajay.stockSimulator.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -39,6 +42,9 @@ public class UserController {
     private UserRepo userRepo;
     @Autowired
     PasswordEncoder passwordEncoder;
+    @Autowired
+    PasswordResetService passwordResetService;
+
     @GetMapping("/greeting")
     public String greeting(){
         return "Hello User you're inside the user controller right now";
@@ -169,6 +175,22 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Double> getUserPortfolioValue(@PathVariable long id){
         return ResponseEntity.ok(userService.getPortfolioValue(id));
+    }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestParam String email) {
+        passwordResetService.forgotPassword(email);
+        return ResponseEntity.ok(
+                "If the email exists, a reset link has been sent"
+        );
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(
+            @RequestParam String token,
+            @RequestParam String newPassword) {
+
+        passwordResetService.resetPassword(token, newPassword);
+        return ResponseEntity.ok("Password updated successfully");
     }
 
 
