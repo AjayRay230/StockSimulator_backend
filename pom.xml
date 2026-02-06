@@ -114,10 +114,11 @@
 			<version>0.12.6</version>
 			<scope>runtime</scope>
 		</dependency>
-        <!-- pom.xml -->
+
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
+            <groupId>com.sendgrid</groupId>
+            <artifactId>sendgrid-java</artifactId>
+            <version>4.10.2</version>
         </dependency>
 
     </dependencies>
