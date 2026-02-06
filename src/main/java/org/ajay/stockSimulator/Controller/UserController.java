@@ -50,13 +50,13 @@ public class UserController {
         return "Hello User you're inside the user controller right now";
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/id/{id}")
     public ResponseEntity<User> getUserById(@PathVariable long id){
         return userService.getUserById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-    @GetMapping("/{id}/balance")
+    @GetMapping("/id/{id}/balance")
     public ResponseEntity<String> getUserBalance(@PathVariable long id) {
         Optional<User> userOptional = userService.getUserById(id);
 
@@ -159,19 +159,19 @@ public class UserController {
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/id/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok("User has been deleted ");
     }
-    @PutMapping("/{id}/role")
+    @PutMapping("/id/{id}/role")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<User> updateUserRole(@PathVariable long id, @RequestParam String role) {
         return ResponseEntity.ok(userService.updateUserRole(id, role));
     }
 
-    @GetMapping("/{id}/portfolio-value")
+    @GetMapping("/id/{id}/portfolio-value")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Double> getUserPortfolioValue(@PathVariable long id){
         return ResponseEntity.ok(userService.getPortfolioValue(id));

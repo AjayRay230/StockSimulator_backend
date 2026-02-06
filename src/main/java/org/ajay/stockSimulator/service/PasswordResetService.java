@@ -1,5 +1,6 @@
 package org.ajay.stockSimulator.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.ajay.stockSimulator.Repo.PasswordResetTokenRepo;
 import org.ajay.stockSimulator.Repo.UserRepo;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class PasswordResetService {
 
     private final UserRepo userRepo;
