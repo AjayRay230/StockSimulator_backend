@@ -29,21 +29,14 @@ public class PortfolioItemController {
     public String greeting(){
         return "Hey user you're inside the portfolio! controller";
     }
-
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<PortfolioItemDtos>> getPortfolioItemByUserId(
-            @PathVariable Long userId,
+    @GetMapping("/user")
+    public ResponseEntity<List<PortfolioItemDtos>> getPortfolioItemByUser(
             Principal principal) {
 
-        String username = principal.getName();
-        User user = userRepo.findByUsername(username);
-
-        if (!user.getUserId().equals(userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        User user = userRepo.findByUsername(principal.getName());
 
         List<PortfolioItemDtos> items =
-                portfolioItemService.getAllPortfolioItemById(userId);
+                portfolioItemService.getAllPortfolioItemById(user.getUserId());
 
         if (items.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -51,55 +44,50 @@ public class PortfolioItemController {
         return ResponseEntity.ok(items);
     }
 
-    @GetMapping("/user/{userId}/{stocksymbol}")
-    public ResponseEntity<PortfolioItem> getAllPortfolioItem(@PathVariable Long userId, @PathVariable String stocksymbol) {
-        PortfolioItem portfolioItem = portfolioItemService.getPortfolioBySymbol(userId, stocksymbol);
-        return portfolioItem == null ? new ResponseEntity<>(HttpStatus.NOT_FOUND) : new ResponseEntity<>(portfolioItem, HttpStatus.OK);
-
-    }
-    @PostMapping("/user/{userId}/add")
+    @PostMapping("/user/add")
     public ResponseEntity<?> addPortfolioItem(
-            @PathVariable Long userId,
             @RequestBody PortfolioItemDTO dto,
             Principal principal) {
 
-        String username = principal.getName();
-        User user = userRepo.findByUsername(username);
-
-        if (!user.getUserId().equals(userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
         try {
+            // 1. Identify user from JWT
+            String username = principal.getName();
+            User user = userRepo.findByUsername(username);
+
+            // 2. Use INTERNAL userId (not from frontend)
             PortfolioItem createdItem =
-                    portfolioItemService.addNewPortfolioItem(userId, dto);
+                    portfolioItemService.addNewPortfolioItem(
+                            user.getUserId(),
+                            dto
+                    );
+
             return new ResponseEntity<>(createdItem, HttpStatus.CREATED);
+
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body("Error adding portfolio item: " + e.getMessage());
         }
     }
-    @DeleteMapping("/user/{userId}/{stocksymbol}/delete")
+
+
+    @DeleteMapping("/user/{stocksymbol}/delete")
     public ResponseEntity<PortfolioItem> deletePortfolioItem(
-            @PathVariable Long userId,
             @PathVariable String stocksymbol,
             Principal principal) {
 
-        String username = principal.getName();
-        User user = userRepo.findByUsername(username);
+        User user = userRepo.findByUsername(principal.getName());
 
-        if (!user.getUserId().equals(userId)) {
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-        }
+        PortfolioItem item =
+                portfolioItemService.deletePortfioItem(
+                        user.getUserId(), stocksymbol
+                );
 
-        PortfolioItem portfolioItem =
-                portfolioItemService.deletePortfioItem(userId, stocksymbol);
-
-        if (portfolioItem == null) {
+        if (item == null) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity<>(portfolioItem, HttpStatus.OK);
+        return new ResponseEntity<>(item, HttpStatus.OK);
     }
+
 
 //    @PostMapping("/user/add")
 //    public ResponseEntity<PortfolioItem> addPortfolioItem(@RequestBody PortfolioItemDTO dto) {
