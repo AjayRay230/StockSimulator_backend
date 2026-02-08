@@ -74,19 +74,15 @@ public class TransactionController {
     }
 
 
-    @GetMapping("/history/{id}")
-    public ResponseEntity<List<Transaction>> userHistory(
-            @PathVariable Long id,
-            Principal principal) {
+    @GetMapping("/history/me")
+    public ResponseEntity<List<Transaction>> userHistory(Principal principal) {
 
         String username = principal.getName();
         User user = userRepo.findByUsername(username);
 
-        if (!user.getUserId().equals(id)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
+        List<Transaction> list =
+                transactionService.getuserHistory(user.getUserId());
 
-        List<Transaction> list = transactionService.getuserHistory(id);
         return ResponseEntity.ok(list);
     }
 

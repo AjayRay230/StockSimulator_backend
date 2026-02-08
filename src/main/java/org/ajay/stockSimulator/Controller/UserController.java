@@ -1,14 +1,11 @@
 package org.ajay.stockSimulator.Controller;
 
 import org.ajay.stockSimulator.DTOs.AuthRequest;
-import org.ajay.stockSimulator.DTOs.AuthResponse;
 import org.ajay.stockSimulator.DTOs.AuthResponseDTO;
 import org.ajay.stockSimulator.DTOs.RegistrationRequest;
 import org.ajay.stockSimulator.Repo.UserRepo;
-import org.ajay.stockSimulator.model.PasswordResetToken;
 import org.ajay.stockSimulator.model.User;
 import org.ajay.stockSimulator.service.JWTService;
-
 import org.ajay.stockSimulator.service.PasswordResetService;
 import org.ajay.stockSimulator.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,41 +49,29 @@ public class UserController {
         return "Hello User you're inside the user controller right now";
     }
 
-    @GetMapping("/id/{id}")
-    public ResponseEntity<User> getUserById(
-            @PathVariable long id,
-            Principal principal) {
+    @GetMapping("/me")
+    public ResponseEntity<User> getUserById(Principal principal) {
 
         User loggedIn = userRepo.findByUsername(principal.getName());
 
-        if (!loggedIn.getUserId().equals(id)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (loggedIn == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        return userService.getUserById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(loggedIn);
     }
 
-    @GetMapping("/id/{id}/balance")
-    public ResponseEntity<String> getUserBalance(
-            @PathVariable long id,
-            Principal principal) {
+    @GetMapping("/me/balance")
+    public ResponseEntity<String> getUserBalance(Principal principal) {
 
-        User loggedIn = userRepo.findByUsername(principal.getName());
+        User user = userRepo.findByUsername(principal.getName());
 
-        if (!loggedIn.getUserId().equals(id)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        Optional<User> userOptional = userService.getUserById(id);
-
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         return ResponseEntity.ok(
-                "The current Balance is: Rs. " + userOptional.get().getAmount()
+                "The current Balance is: Rs. " + user.getAmount()
         );
     }
 
@@ -181,23 +166,50 @@ public class UserController {
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
-    @DeleteMapping("/id/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteUser(@PathVariable long id) {
-        userService.deleteUser(id);
-        return ResponseEntity.ok("User has been deleted ");
-    }
-    @PutMapping("/id/{id}/role")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<User> updateUserRole(@PathVariable long id, @RequestParam String role) {
-        return ResponseEntity.ok(userService.updateUserRole(id, role));
+    @DeleteMapping("/id/me")
+    public ResponseEntity<?> deleteUser(Principal principal) {
+
+        User user = userRepo.findByUsername(principal.getName());
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        userService.deleteUser(user.getUserId());
+        return ResponseEntity.ok("User has been deleted");
     }
 
-    @GetMapping("/id/{id}/portfolio-value")
+    @PutMapping("/id/me/role")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Double> getUserPortfolioValue(@PathVariable long id){
-        return ResponseEntity.ok(userService.getPortfolioValue(id));
+    public ResponseEntity<User> updateUserRole(
+            @RequestParam String role,
+            Principal principal) {
+
+        User user = userRepo.findByUsername(principal.getName());
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        return ResponseEntity.ok(
+                userService.updateUserRole(user.getUserId(), role)
+        );
     }
+
+    @GetMapping("/id/me/portfolio-value")
+    public ResponseEntity<Double> getUserPortfolioValue(Principal principal){
+
+        User user = userRepo.findByUsername(principal.getName());
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        return ResponseEntity.ok(
+                userService.getPortfolioValue(user.getUserId())
+        );
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(@RequestParam String email) {
         passwordResetService.forgotPassword(email);

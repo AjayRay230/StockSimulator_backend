@@ -88,7 +88,7 @@ public class StockPriceController {
            double fiftyTwoWeekHigh = Double.parseDouble((String) week52.get("high"));
            double fiftyTwoWeekLow = Double.parseDouble((String) week52.get("low"));
 
-//                String marketCap = (String) map.get("market_cap");
+
 //               String peRatio = (String) map.get("pe_ratio");
 //                String dividendYield = (String) map.get("dividend");
             Map<String, Object> result = Map.ofEntries(
