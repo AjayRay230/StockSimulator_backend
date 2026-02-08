@@ -14,7 +14,5 @@ import lombok.NoArgsConstructor;
 
 public class WatchlistRequest {
     private String stocksymbol;
-    @Id
 
-    private Long userId;
 }

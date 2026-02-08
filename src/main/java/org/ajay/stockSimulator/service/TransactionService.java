@@ -39,9 +39,7 @@ public class TransactionService {
     }
     public void buyStock(User user,String stocksymbol,Integer quantity)
     {
-        System.out.println("User: " + user.getUsername());
-        System.out.println("User ID: " + user.getUserId());
-        System.out.println("Stock symbol: " + stocksymbol);
+
 
 
         Stock stock = stockRepo.findById(stocksymbol)
@@ -61,6 +59,7 @@ public class TransactionService {
         {
             item = new  PortfolioItem();
             item.setUser(user);
+            item.setStock(stock);
             item.setStocksymbol(stocksymbol);
             item.setQuantity(quantity);
             item.setAveragebuyprice(stock.getCurrentprice());
@@ -98,46 +97,63 @@ public class TransactionService {
     }
 
     public void sellStock(Long id, String stocksymbol, int quantity) {
-        // 1. Get User safely
+
+        // 0. Basic validation
+        if (quantity <= 0) {
+            throw new RuntimeException("Quantity must be greater than zero");
+        }
+
+        // 1. Get User
         User user = userRepo.findByUserId(id)
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
+                .orElseThrow(() -> new RuntimeException(
+                        "User not found with ID: " + id
+                ));
 
         // 2. Get Stock
         Stock stock = stockRepo.findById(stocksymbol)
-                .orElseThrow(() -> new RuntimeException("No stock found with symbol: " + stocksymbol));
+                .orElseThrow(() -> new RuntimeException(
+                        "No stock found with symbol: " + stocksymbol
+                ));
 
-        // 3. Calculate total price
-        BigDecimal totalPrice = stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
+        // 3. Get PortfolioItem FIRST (ownership + quantity check)
+        PortfolioItem item = portfolioItemRepo
+                .findByUser_UserIdAndStocksymbol(id, stocksymbol);
 
-        // 4. Update User balance
-        user.setAmount(user.getAmount().add(totalPrice));
-        userRepo.save(user);
-
-        // 5. Get PortfolioItem
-        PortfolioItem item = portfolioItemRepo.findByUser_UserIdAndStocksymbol(id, stocksymbol);
         if (item == null || item.getQuantity() < quantity) {
             throw new RuntimeException("Insufficient stock to sell");
         }
 
+        // 4. Calculate total sell value
+        BigDecimal totalPrice =
+                stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
+
+        // 5. Update User balance AFTER validation
+        user.setAmount(user.getAmount().add(totalPrice));
+        userRepo.save(user);
+
         // 6. Update PortfolioItem
-        item.setQuantity(item.getQuantity() - quantity);
-        if (item.getQuantity() <= 0) {
+        int remainingQty = item.getQuantity() - quantity;
+
+        if (remainingQty <= 0) {
             portfolioItemRepo.delete(item);
         } else {
+            item.setQuantity(remainingQty);
             portfolioItemRepo.save(item);
         }
 
         // 7. Save Transaction
         Transaction tnx = new Transaction();
         tnx.setUser(user);
-        tnx.setQuantity(quantity);
         tnx.setStocksymbol(stocksymbol);
+        tnx.setQuantity(quantity);
         tnx.setType(TransactionType.SELL);
         tnx.setTimestamp(LocalDateTime.now());
         tnx.setCurrentprice(stock.getCurrentprice());
         tnx.setTotalAmount(totalPrice);
+
         transactionRepo.save(tnx);
     }
+
 
 
     public List<Transaction> getuserHistory(Long id) {

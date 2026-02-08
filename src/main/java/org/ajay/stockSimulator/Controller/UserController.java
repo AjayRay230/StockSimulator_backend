@@ -2,6 +2,7 @@ package org.ajay.stockSimulator.Controller;
 
 import org.ajay.stockSimulator.DTOs.AuthRequest;
 import org.ajay.stockSimulator.DTOs.AuthResponse;
+import org.ajay.stockSimulator.DTOs.AuthResponseDTO;
 import org.ajay.stockSimulator.DTOs.RegistrationRequest;
 import org.ajay.stockSimulator.Repo.UserRepo;
 import org.ajay.stockSimulator.model.PasswordResetToken;
@@ -23,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,22 +53,43 @@ public class UserController {
     }
 
     @GetMapping("/id/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable long id){
+    public ResponseEntity<User> getUserById(
+            @PathVariable long id,
+            Principal principal) {
+
+        User loggedIn = userRepo.findByUsername(principal.getName());
+
+        if (!loggedIn.getUserId().equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         return userService.getUserById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
     @GetMapping("/id/{id}/balance")
-    public ResponseEntity<String> getUserBalance(@PathVariable long id) {
+    public ResponseEntity<String> getUserBalance(
+            @PathVariable long id,
+            Principal principal) {
+
+        User loggedIn = userRepo.findByUsername(principal.getName());
+
+        if (!loggedIn.getUserId().equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         Optional<User> userOptional = userService.getUserById(id);
 
         if (userOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        User user = userOptional.get();  // safely unwrap Optional
-        return ResponseEntity.ok("The current Balance is: Rs. " + user.getAmount());
+        return ResponseEntity.ok(
+                "The current Balance is: Rs. " + userOptional.get().getAmount()
+        );
     }
+
 
     @PostMapping("/add")
     @PreAuthorize("hasRole('ADMIN')")
@@ -97,15 +120,14 @@ public class UserController {
         String token = jWTService.generateToken(user);
 
 
-        return ResponseEntity.ok(new AuthResponse(
-                token,
-                user.getUserId(),
-                user.getRole(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getEmail(),
-                user.getAmount()
-        ));
+        return ResponseEntity.ok(
+                new AuthResponseDTO(
+                        token,
+                        user.getFirstName(),
+                        user.getLastName(),
+                        user.getRole()
+                )
+        );
     }
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest authRequest) {
@@ -136,15 +158,15 @@ public class UserController {
 //                }
             // Step 4: Generate token and return success
             String token = jWTService.generateToken(user);
-            return ResponseEntity.ok(new AuthResponse(
-                                token,
-                    user.getUserId(),
-                    user.getRole(),
-                    user.getFirstName(),
-                    user.getLastName(),
-                    user.getEmail(),
-                    user.getAmount()
-                        ));
+            return ResponseEntity.ok(
+                    new AuthResponseDTO(
+                            token,
+                            user.getFirstName(),
+                            user.getLastName(),
+                            user.getRole()
+                    )
+            );
+
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid password");
         }

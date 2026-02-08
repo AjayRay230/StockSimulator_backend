@@ -12,10 +12,7 @@ import java.math.BigDecimal;
 public class RegistrationRequest {
  private String firstName;
  private String lastName;
-
-private String username;
-private String password;
-private String email;
-private BigDecimal amount;
-private String role;
+ private String username;
+ private String password;
+ private String email;
 }

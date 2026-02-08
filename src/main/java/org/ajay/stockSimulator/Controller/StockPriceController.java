@@ -3,6 +3,7 @@ package org.ajay.stockSimulator.Controller;
 import org.ajay.stockSimulator.model.StockPrice;
 import org.ajay.stockSimulator.service.StockPriceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,9 +24,11 @@ public class StockPriceController {
     private StockPriceService stockPriceService;
     @Autowired
     private RestTemplate restTemplate;
-    private final  String API_key  = "b391d0af135c4e9b8e2cd8fe6842be62";
+    @Value("${twelvedata.api.key}")
+    private String API_key;
+
     @GetMapping("/{symbol}")
-    public ResponseEntity<List<StockPrice>> getStockPrice(@PathVariable String stocksymbol) {
+    public ResponseEntity<List<StockPrice>> getStockPrice(@PathVariable("symbol") String stocksymbol) {
         List<StockPrice> prices  = stockPriceService.getPricesBySymbolOrderByTimeAsc(stocksymbol);
         return prices.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(prices);
     }
@@ -42,13 +45,18 @@ public class StockPriceController {
             case "1M":interval = "1day";outputsize = "30" ;break;
             case "1Y":interval = "1week";outputsize = "52" ;break;
             case "MAX":interval = "1month";outputsize = "120" ;break;
+            default:
+                interval = "1min";
+                outputsize = "390";
+                break;
+
         }
         String url = String.format(
                 "https://api.twelvedata.com/time_series?symbol=%s&interval=%s&outputsize=%s&apikey=%s",
                 stocksymbol, interval, outputsize, API_key
         );
 
-        System.out.println("url: " + url);
+
         ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
         Map body = response.getBody();
         if (body != null && body.containsKey("values")) {

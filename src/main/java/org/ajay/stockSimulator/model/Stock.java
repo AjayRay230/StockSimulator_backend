@@ -1,5 +1,6 @@
 package org.ajay.stockSimulator.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,7 +13,7 @@ import java.util.Date;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Stock {
 
     @Id

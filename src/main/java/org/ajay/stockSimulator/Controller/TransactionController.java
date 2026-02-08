@@ -35,40 +35,61 @@ public class TransactionController {
     }
     @PostMapping("/buy")
     public ResponseEntity<String> buyStock(@RequestBody BuyStockRequest request, Principal principal) {
-
-        System.out.println("Received request:");
-        System.out.println("Symbol: " + request.getStocksymbol());
-        System.out.println("Qty: " + request.getQuantity());
-
-
-        try{
+        try {
             String username = principal.getName();
             User user = userRepo.findByUsername(username);
-            transactionService.buyStock(user,request.getStocksymbol(),request.getQuantity());
-            return  new ResponseEntity<>(" purchase successful", HttpStatus.OK);
-        }
-        catch(RuntimeException e)
-        {
-            return ResponseEntity.badRequest().body( "purchase failed " +e.getMessage());
+
+            transactionService.buyStock(
+                    user,
+                    request.getStocksymbol(),
+                    request.getQuantity()
+            );
+
+            return ResponseEntity.ok("purchase successful");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("purchase failed " + e.getMessage());
         }
     }
+
     @PostMapping("/sell")
-    public ResponseEntity<String> sellStock(@RequestBody SellStockRequest request)
-    {
-        try{
-            transactionService.sellStock(request.getId(),request.getStocksymbol(),request.getQuantity());
-            return  new ResponseEntity<>(" selling successful", HttpStatus.OK);
-        }
-        catch (RuntimeException e)
-        {
-            return ResponseEntity.badRequest().body( "selling failed " +e.getMessage());
+    public ResponseEntity<String> sellStock(
+            @RequestBody SellStockRequest request,
+            Principal principal) {
+
+        try {
+            String username = principal.getName();
+            User user = userRepo.findByUsername(username);
+
+            transactionService.sellStock(
+                    user.getUserId(),
+                    request.getStocksymbol(),
+                    request.getQuantity()
+            );
+
+            return ResponseEntity.ok("selling successful");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body("selling failed " + e.getMessage());
         }
     }
+
+
     @GetMapping("/history/{id}")
-    public ResponseEntity<List<Transaction>> userHistory(@PathVariable Long id){
-        List<Transaction>  list = transactionService.getuserHistory(id);
-        return new ResponseEntity<>(list,HttpStatus.OK);
+    public ResponseEntity<List<Transaction>> userHistory(
+            @PathVariable Long id,
+            Principal principal) {
+
+        String username = principal.getName();
+        User user = userRepo.findByUsername(username);
+
+        if (!user.getUserId().equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        List<Transaction> list = transactionService.getuserHistory(id);
+        return ResponseEntity.ok(list);
     }
+
     @GetMapping("/active-traders")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<ActiveTraderDTO>> getActiveTradersToday(@RequestParam(defaultValue = "5") int limit) {

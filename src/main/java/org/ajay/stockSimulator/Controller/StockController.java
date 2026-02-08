@@ -7,14 +7,16 @@ import org.ajay.stockSimulator.service.StockService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
-@Controller
+
 @RestController
 @RequestMapping("/api/stock")
 @CrossOrigin
@@ -28,10 +30,14 @@ public class StockController {
         return "Hello User you're inside the Stock controller right now";
     }
     @PostMapping("/by-price")
-    public ResponseEntity<List<Stock>> getAllStocksByPrice(@RequestBody Stock stock){
-        return ResponseEntity.ok(stockService.getAllStocksWithPrice(stock.getCurrentprice()));
+    public ResponseEntity<List<Stock>> getAllStocksByPrice(
+            @RequestParam("price") double price) {
 
+        return ResponseEntity.ok(
+                stockService.getAllStocksWithPrice(BigDecimal.valueOf(price))
+        );
     }
+
     @GetMapping("/{symbol}")
     public ResponseEntity<Stock> getStockBySymbol(@PathVariable  String symbol){
         Stock stock = stockService.getStockWithSymbol(symbol);
@@ -45,20 +51,24 @@ public class StockController {
 
     }
     @PostMapping("/simulate")
-    public ResponseEntity<String> simulateStock(){
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> simulateStock() {
         stockService.simulatePrice();
-        return new ResponseEntity<>("Success", HttpStatus.OK);
+        return ResponseEntity.ok("Success");
     }
-     @PostMapping("/add")
-    public ResponseEntity<StockPrice> addStock(@RequestBody StockPrice stockPrice){
-            StockPrice stock = stockPriceservice.AddStockWithSymbol(stockPrice);
-            if(stock == null){
-                return new  ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            else {
-                return new ResponseEntity<>(stockPrice,HttpStatus.OK);
-            }
-     }
+
+    @PostMapping("/add")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StockPrice> addStock(@RequestBody StockPrice stockPrice) {
+
+        StockPrice stock = stockPriceservice.AddStockWithSymbol(stockPrice);
+
+        if (stock == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return ResponseEntity.ok(stock);
+    }
+
      @GetMapping("/symbol")
      public ResponseEntity<List<Stock>> getAllStocks(){
         List<Stock> list = stockService.getAllStocks();
