@@ -67,23 +67,17 @@ public class WatchListController {
                     .body("Failed to remove from the watchlist " + e.getMessage());
         }
     }
-    @GetMapping("/{userId}")
-    public ResponseEntity<List<Watchlist>> getWatchListByUserId(
-            @PathVariable Long userId,
-            Principal principal) {
+    @GetMapping("/me")
+    public ResponseEntity<List<Watchlist>> getMyWatchlist(Principal principal) {
 
         String username = principal.getName();
         User user = userRepo.findByUsername(username);
 
-        // Security check
-        if (!user.getUserId().equals(userId)) {
-            return ResponseEntity.status(403).build();
-        }
-
         return ResponseEntity.ok(
-                watchListService.getUserWatchlist(userId)
+                watchListService.getUserWatchlist(user.getUserId())
         );
     }
+
 
 
 }
