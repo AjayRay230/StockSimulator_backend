@@ -1,15 +1,3 @@
-INSERT INTO users (username, firstname,lastname,password, email, amount, role)
-
-VALUES (
-           'ajay',
-           'Ajay',
-           'Roy',
-           '$2a$12$8bE6Kp13ySFLAObO7WG6XO65/6VAf5VO6dpY1Wbcyad1IeaYUq/ES',
-           'ajay@example.com',
-           100000.00,
-           'USER'
-       ),
-       ('admin','Admin','Sir', '$2a$12$9dxWJKw16MxhaiuoL184Ou3AxxAe.VBpVUE3byIXMnuhOsycA1cIq', 'admin@example.com', 100000.00, 'ADMIN');
 
 -- STOCK DATA
 INSERT INTO stock (symbol, companyname, currentprice, changepercent, lastupdate) VALUES
@@ -43,19 +31,3 @@ INSERT INTO stock_price (symbol, open_price, close_price, high_price, low_price,
                                                                                                 ('TSLA', 705.00, 699.60, 710.00, 690.00, CURRENT_TIMESTAMP),
                                                                                                 ('AMZN', 3400.00, 3450.25, 3460.00, 3390.00, CURRENT_TIMESTAMP),
                                                                                                 ('DIS', 88.00, 89.50, 90.00, 87.00, CURRENT_TIMESTAMP);
-
--- TRANSACTIONS
-INSERT INTO transactions (user_id, stocksymbol, currentprice, quantity, timestamp, type, total_amount) VALUES
-                                                                                                           (1, 'AAPL', 197.20, 5, CURRENT_TIMESTAMP, 'BUY', 986.00),
-                                                                                                           (2, 'GOOGL', 2800.50, 1, CURRENT_TIMESTAMP, 'BUY', 2800.50);
-
--- PORTFOLIO ITEMS
-INSERT INTO portfolio_item (user_id, stocksymbol, quantity, averagebuyprice) VALUES
-                                                                                 (1, 'AAPL', 5, 190.00),
-                                                                                 (2, 'GOOGL', 1, 2780.00);
-
-
--- WATCHLIST
-INSERT INTO watchlist (user_id, stocksymbol, add_time) VALUES
-                                                           (1, 'TSLA', CURRENT_TIMESTAMP),
-                                                           (2, 'AMZN', CURRENT_TIMESTAMP);
