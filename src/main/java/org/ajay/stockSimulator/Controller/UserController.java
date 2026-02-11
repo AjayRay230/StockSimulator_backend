@@ -22,8 +22,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.security.Principal;
-import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/user")
@@ -76,17 +74,6 @@ public class UserController {
     }
 
 
-    @PostMapping("/add")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> addUser(@RequestBody User user){
-        try{
-            User created = userService.addUserById(user);
-            return ResponseEntity.ok(created);
-        }
-        catch(Exception e){
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User could not be added " +e.getMessage());
-        }
-    }
     @PostMapping("/register")
     public ResponseEntity<?> registerUsers(@RequestBody RegistrationRequest  registrationRequest)
     {
@@ -156,16 +143,8 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid password");
         }
     }
-    @GetMapping("/count")
-    @PreAuthorize("hasRole('ADMIN')")
-    public long getTotalUsers() {
-        return  userService.countUsers();
-    }
-    @GetMapping("/all")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
-    }
+
+
     @DeleteMapping("/id/me")
     public ResponseEntity<?> deleteUser(Principal principal) {
 

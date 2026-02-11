@@ -47,7 +47,7 @@ public class SpringConfiguration {
                                 "/api/user/login","/h2-console/**","/api/user/forgot-password","/api/user/reset-password"
 
                         ).permitAll()
-                        .requestMatchers("/api/user/add").hasRole("ADMIN")
+                        .requestMatchers("/api/user/add","/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
 
