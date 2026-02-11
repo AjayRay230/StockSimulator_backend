@@ -73,7 +73,7 @@ PasswordEncoder passwordEncoder;
     }
 
     public void deleteUser(long id) {
-        userRepo.deleteUserByuserId(id);
+        userRepo.deleteById(id);
     }
 
     public User updateUserRole(long id, String role) {
