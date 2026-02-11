@@ -33,21 +33,26 @@ public interface TransactionRepo extends JpaRepository<Transaction,Long> {
     List<Object[]> findTopStocks();
 
     // Trades Executed Today
-    @Query(value = "SELECT stocksymbol, COUNT(*), MAX(timestamp) " +
-            "FROM transaction " +
-            "WHERE timestamp::date = CURRENT_DATE " +
-            "GROUP BY stocksymbol " +
-            "ORDER BY COUNT(*) DESC", nativeQuery = true)
+    @Query(value = """
+    SELECT stocksymbol, COUNT(id), MAX(timestamp)
+    FROM transactions
+    WHERE timestamp::date = CURRENT_DATE
+    GROUP BY stocksymbol
+    ORDER BY COUNT(id) DESC
+""", nativeQuery = true)
     List<Object[]> findTradesExecuted();
 
     // Active Traders
-    @Query(value = "SELECT u.user_id, u.username, u.email, COUNT(t.*) AS trade_count " +
-            "FROM transaction t " +
-            "JOIN users u ON t.user_id = u.user_id " +
-            "WHERE t.timestamp::date = CURRENT_DATE " +
-            "GROUP BY u.user_id, u.username, u.email " +
-            "ORDER BY trade_count DESC", nativeQuery = true)
+    @Query(value = """
+    SELECT u.user_id, u.username, u.email, COUNT(t.id) AS trade_count
+    FROM transactions t
+    JOIN users u ON t.user_id = u.user_id
+    WHERE t.timestamp::date = CURRENT_DATE
+    GROUP BY u.user_id, u.username, u.email
+    ORDER BY trade_count DESC
+""", nativeQuery = true)
     List<Object[]> findActiveTraders();
+
     Page<Transaction> findAllByOrderByTimestampDesc(Pageable pageable);
 
 
