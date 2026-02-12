@@ -191,14 +191,25 @@ public class TransactionService {
 
     // 🔹 Trades Executed Today
     public List<TradersExecutedDTO> getTradesExecutedToday(int limit) {
+
         return transactionRepo.findTradesExecuted()
                 .stream()
                 .limit(limit)
-                .map(obj -> new TradersExecutedDTO(
-                        (String) obj[0],       // stock symbol
-                        (Long) obj[1],         // ✅ totalTrades as long
-                        (LocalDateTime) obj[2] // timestamp
-                ))
+                .map(obj -> {
+
+                    String symbol = (String) obj[0];
+
+                    Long totalTrades = ((Number) obj[1]).longValue();
+
+                    java.sql.Timestamp timestamp = (java.sql.Timestamp) obj[2];
+                    LocalDateTime time = timestamp.toLocalDateTime();
+
+                    return new TradersExecutedDTO(
+                            symbol,
+                            totalTrades,
+                            time
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
