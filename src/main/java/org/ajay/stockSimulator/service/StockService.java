@@ -41,6 +41,7 @@ public class StockService {
 
 
 
+
     public List<Stock> SearchStock(String query) {
         return stockRepo.searchStockLike(query);
     }
@@ -50,6 +51,11 @@ public class StockService {
     }
 
     public Stock findStockBySymbolOrCompanyName(String query) {
-        return stockRepo.findBySymbolIgnoreCaseOrCompanynameIgnoreCase(query,query);
+        return stockRepo
+                .findBySymbolIgnoreCase(query)
+                .orElse(
+                        stockRepo.findByCompanynameContainingIgnoreCase(query)
+                                .orElse(null)
+                );
     }
 }

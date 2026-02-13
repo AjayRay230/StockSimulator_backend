@@ -38,17 +38,14 @@ public class StockController {
         );
     }
 
-    @GetMapping("/{symbol}")
-    public ResponseEntity<Stock> getStockBySymbol(@PathVariable  String symbol){
-        Stock stock = stockService.getStockWithSymbol(symbol);
-        if(stock == null){
-            return new  ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        else {
-            return new  ResponseEntity<>(stock,HttpStatus.OK);
-        }
+    @GetMapping("/{query}")
+    public ResponseEntity<Stock> getStock(@PathVariable String query) {
+        Stock stock = stockService.findStockBySymbolOrCompanyName(query);
 
-
+        if (stock == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(stock, HttpStatus.OK);
     }
     @PostMapping("/simulate")
     @PreAuthorize("hasRole('ADMIN')")
