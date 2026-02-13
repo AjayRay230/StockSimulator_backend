@@ -38,7 +38,7 @@ public class StockController {
         );
     }
 
-    @GetMapping("/{query}")
+    @GetMapping("/detail/{query}")
     public ResponseEntity<Stock> getStock(@PathVariable String query) {
         Stock stock = stockService.findStockBySymbolOrCompanyName(query);
 
