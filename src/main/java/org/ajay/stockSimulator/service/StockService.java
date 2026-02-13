@@ -2,26 +2,31 @@ package org.ajay.stockSimulator.service;
 
 import org.ajay.stockSimulator.Repo.StockRepo;
 import org.ajay.stockSimulator.model.Stock;
-import org.ajay.stockSimulator.model.StockPrice;
+
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
+;
 
 @Service
 public class StockService {
 
     @Autowired
     private StockRepo stockRepo;
+
+    @Autowired
+    private TwelveDataService twelveDataService;
     public List<Stock> getAllStocksWithPrice(BigDecimal currentprice) {
        return  stockRepo.findByCurrentprice(currentprice);
     }
 
     public Stock getStockWithSymbol(String symbol) {
-        return stockRepo.findById(String.valueOf(symbol)).orElseThrow(()-> new RuntimeException("Stock not found" + symbol));
+        return stockRepo.findById(symbol.toUpperCase()).orElseThrow(()-> new RuntimeException("Stock not found" + symbol));
 
     }
 
@@ -43,19 +48,54 @@ public class StockService {
 
 
     public List<Stock> SearchStock(String query) {
-        return stockRepo.searchStockLike(query);
+
+        query = query.trim();
+
+        List<Stock> localResults =
+                stockRepo.searchStockLike(query, PageRequest.of(0, 10));
+
+        if (!localResults.isEmpty()) {
+            return localResults;
+        }
+
+        try {
+            Stock externalStock = twelveDataService.fetchFromTwelve(query);
+
+            if (externalStock != null) {
+
+                externalStock.setSymbol(
+                        externalStock.getSymbol().toUpperCase()
+                );
+
+                if (!stockRepo.existsById(externalStock.getSymbol())) {
+                    stockRepo.save(externalStock);
+                }
+
+                return List.of(externalStock);
+            }
+
+        } catch (Exception e) {
+            // optional logging
+        }
+
+        return List.of();
     }
 
     public List<Stock> getAllStocks() {
         return stockRepo.findAll();
     }
-
     public Stock findStockBySymbolOrCompanyName(String query) {
-        return stockRepo
-                .findBySymbolIgnoreCase(query)
-                .orElse(
-                        stockRepo.findByCompanynameContainingIgnoreCase(query)
-                                .orElse(null)
-                );
+
+        List<Stock> results =
+                stockRepo.searchStockLike(query.trim(), PageRequest.of(0, 10));
+
+        return results.stream()
+                .sorted((a, b) -> {
+                    if (a.getSymbol().equalsIgnoreCase(query)) return -1;
+                    if (b.getSymbol().equalsIgnoreCase(query)) return 1;
+                    return 0;
+                })
+                .findFirst()
+                .orElse(null);
     }
 }

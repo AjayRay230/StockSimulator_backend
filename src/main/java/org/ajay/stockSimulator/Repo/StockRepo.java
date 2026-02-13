@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 
+import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -19,8 +20,12 @@ public interface StockRepo extends JpaRepository<Stock,String> {
 
 
     // For partial and case-insensitive match
-    @Query("SELECT s FROM Stock s WHERE LOWER(s.symbol) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(s.companyname) LIKE LOWER(CONCAT('%', :query, '%'))")
-    List<Stock> searchStockLike(@Param("query") String query);
+    @Query("""
+   SELECT s FROM Stock s
+   WHERE LOWER(s.symbol) LIKE LOWER(CONCAT('%', :query, '%'))
+      OR LOWER(s.companyname) LIKE LOWER(CONCAT('%', :query, '%'))
+""")
+    List<Stock> searchStockLike(@Param("query") String query, Pageable pageable);
 
     Stock findBySymbolIgnoreCaseOrCompanynameIgnoreCase(String symbol, String companyname);
 
@@ -28,4 +33,5 @@ public interface StockRepo extends JpaRepository<Stock,String> {
     Optional<Stock> findBySymbolIgnoreCase(String symbol);
 
     Optional<Stock> findByCompanynameContainingIgnoreCase(String companyname);
+
 }
