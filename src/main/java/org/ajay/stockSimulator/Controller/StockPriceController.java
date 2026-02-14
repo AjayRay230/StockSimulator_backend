@@ -210,33 +210,36 @@ public class StockPriceController {
     @GetMapping("/batch-live")
     public ResponseEntity<?> getBatchLive(@RequestParam List<String> symbols) {
 
-        String joined = String.join(",", symbols);
+        List<Map<String, Object>> result = new ArrayList<>();
 
-        String url = String.format(
-                "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
-                joined, API_key
-        );
+        for (String symbol : symbols) {
+            try {
+                String url = String.format(
+                        "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
+                        symbol, API_key
+                );
 
-        ResponseEntity<Map> response =
-                restTemplate.getForEntity(url, Map.class);
+                ResponseEntity<Map> response =
+                        restTemplate.getForEntity(url, Map.class);
 
-        Map<String, Object> body = response.getBody();
+                Map<String, Object> body = response.getBody();
 
-        if (body == null || body.get("data") == null) {
-            return ResponseEntity.ok(List.of());
+                if (body != null && body.get("price") != null) {
+
+                    Map<String, Object> stockData = new HashMap<>();
+                    stockData.put("symbol", body.get("symbol"));
+                    stockData.put("price", body.get("price"));
+                    stockData.put("change", body.get("change"));
+                    stockData.put("percentChange", body.get("percent_change"));
+                    stockData.put("name", body.get("name")); // FULL NAME
+
+                    result.add(stockData);
+                }
+
+            } catch (Exception e) {
+                System.out.println("Error fetching: " + symbol);
+            }
         }
-
-        List<Map<String, Object>> data =
-                (List<Map<String, Object>>) body.get("data");
-
-        List<Map<String, Object>> result = data.stream()
-                .map(stock -> Map.of(
-                        "symbol", stock.get("symbol"),
-                        "price", stock.get("price"),
-                        "change", stock.get("change"),
-                        "percentChange", stock.get("percent_change")
-                ))
-                .toList();
 
         return ResponseEntity.ok(result);
     }
