@@ -2,6 +2,7 @@ package org.ajay.stockSimulator.Controller;
 
 import org.ajay.stockSimulator.model.StockPrice;
 import org.ajay.stockSimulator.service.StockPriceService;
+import org.ajay.stockSimulator.service.TwelveDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -10,10 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -24,8 +22,15 @@ public class StockPriceController {
     private StockPriceService stockPriceService;
     @Autowired
     private RestTemplate restTemplate;
+    @Autowired
+    private final TwelveDataService twelveDataService;
+
     @Value("${twelvedata.api.key}")
     private String API_key;
+
+    public StockPriceController(TwelveDataService twelveDataService) {
+        this.twelveDataService = twelveDataService;
+    }
 
     @GetMapping("/{symbol}")
     public ResponseEntity<List<StockPrice>> getStockPrice(@PathVariable("symbol") String stocksymbol) {
@@ -205,5 +210,10 @@ public class StockPriceController {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "Failed to get closing price"));
     }
-
+    @GetMapping("/batch-live")
+    public ResponseEntity<?> getBatchLive(@RequestParam List<String> symbols) {
+        return ResponseEntity.ok(
+                twelveDataService.fetchBatchLiveQuotes(symbols)
+        );
+    }
 }

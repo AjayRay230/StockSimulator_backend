@@ -7,8 +7,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+
 
 @Service
 public class TwelveDataService {
@@ -47,5 +48,35 @@ public class TwelveDataService {
         stock.setLastupdate(LocalDateTime.now());
 
         return stock;
+    }
+    public List<Map<String, Object>> fetchBatchLiveQuotes(List<String> symbols) {
+
+        return symbols.parallelStream()
+                .map(symbol -> {
+                    try {
+                        String quoteUrl = String.format(
+                                "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
+                                symbol, apiKey
+                        );
+
+                        Map response = restTemplate.getForObject(quoteUrl, Map.class);
+
+                        if (response != null && response.get("price") != null) {
+
+                            Map<String, Object> result = new HashMap<>();
+                            result.put("symbol", symbol);
+                            result.put("price", new BigDecimal((String) response.get("price")));
+                            result.put("change", new BigDecimal((String) response.get("change")));
+                            result.put("percentChange", new BigDecimal((String) response.get("percent_change")));
+
+                            return result;
+                        }
+
+                    } catch (Exception ignored) {}
+
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }
