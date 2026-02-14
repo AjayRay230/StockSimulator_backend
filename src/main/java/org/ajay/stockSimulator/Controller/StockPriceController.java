@@ -22,15 +22,12 @@ public class StockPriceController {
     private StockPriceService stockPriceService;
     @Autowired
     private RestTemplate restTemplate;
-    @Autowired
-    private final TwelveDataService twelveDataService;
+
 
     @Value("${twelvedata.api.key}")
     private String API_key;
 
-    public StockPriceController(TwelveDataService twelveDataService) {
-        this.twelveDataService = twelveDataService;
-    }
+
 
     @GetMapping("/{symbol}")
     public ResponseEntity<List<StockPrice>> getStockPrice(@PathVariable("symbol") String stocksymbol) {
@@ -212,8 +209,35 @@ public class StockPriceController {
     }
     @GetMapping("/batch-live")
     public ResponseEntity<?> getBatchLive(@RequestParam List<String> symbols) {
-        return ResponseEntity.ok(
-                twelveDataService.fetchBatchLiveQuotes(symbols)
+
+        String joined = String.join(",", symbols);
+
+        String url = String.format(
+                "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
+                joined, API_key
         );
+
+        ResponseEntity<Map> response =
+                restTemplate.getForEntity(url, Map.class);
+
+        Map<String, Object> body = response.getBody();
+
+        if (body == null || body.get("data") == null) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Map<String, Object>> data =
+                (List<Map<String, Object>>) body.get("data");
+
+        List<Map<String, Object>> result = data.stream()
+                .map(stock -> Map.of(
+                        "symbol", stock.get("symbol"),
+                        "price", stock.get("price"),
+                        "change", stock.get("change"),
+                        "percentChange", stock.get("percent_change")
+                ))
+                .toList();
+
+        return ResponseEntity.ok(result);
     }
 }
