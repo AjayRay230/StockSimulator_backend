@@ -34,23 +34,25 @@ public class TransactionController {
         return "Hello User you're inside the Transaction controller right now";
     }
     @PostMapping("/buy")
-    public ResponseEntity<String> buyStock(@RequestBody BuyStockRequest request, Principal principal) {
+    public ResponseEntity<String> buyStock(
+            @RequestBody BuyStockRequest request,
+            Principal principal) {
+
         try {
-            String username = principal.getName();
-            User user = userRepo.findByUsername(username);
 
             transactionService.buyStock(
-                    user,
+                    principal.getName(),   // pass username only
                     request.getStocksymbol(),
                     request.getQuantity()
             );
 
             return ResponseEntity.ok("purchase successful");
+
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("purchase failed " + e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body("purchase failed " + e.getMessage());
         }
     }
-
     @PostMapping("/sell")
     public ResponseEntity<String> sellStock(
             @RequestBody SellStockRequest request,
@@ -60,6 +62,11 @@ public class TransactionController {
             String username = principal.getName();
             User user = userRepo.findByUsername(username);
 
+            if (user == null) {
+                return ResponseEntity.badRequest()
+                        .body("selling failed User not found");
+            }
+
             transactionService.sellStock(
                     user.getUserId(),
                     request.getStocksymbol(),
@@ -67,12 +74,12 @@ public class TransactionController {
             );
 
             return ResponseEntity.ok("selling successful");
+
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest()
                     .body("selling failed " + e.getMessage());
         }
     }
-
 
     @GetMapping("/history/me")
     public ResponseEntity<List<Transaction>> userHistory(Principal principal) {

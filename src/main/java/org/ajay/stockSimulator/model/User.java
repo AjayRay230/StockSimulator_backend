@@ -22,6 +22,7 @@ public class User {
    private String email;
    private BigDecimal amount;
    private String role;
-
+    @Version
+    private Long version;
 
 }

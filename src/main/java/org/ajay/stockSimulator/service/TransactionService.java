@@ -1,4 +1,5 @@
 package org.ajay.stockSimulator.service;
+import jakarta.transaction.Transactional;
 import org.ajay.stockSimulator.DTOs.ActiveTraderDTO;
 import org.ajay.stockSimulator.DTOs.RecentTradeDTO;
 import org.ajay.stockSimulator.DTOs.TopStockDTO;
@@ -37,47 +38,70 @@ public class TransactionService {
         this.transactionRepo = transactionRepo;
         this.stockRepo = stockRepo;
     }
-    public void buyStock(User user,String stocksymbol,Integer quantity)
-    {
+    @Transactional
+    public void buyStock(String username,
+                         String stocksymbol,
+                         Integer quantity) {
 
+        if (quantity <= 0) {
+            throw new RuntimeException("Quantity must be greater than zero");
+        }
 
-
+        User user = userRepo.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
         Stock stock = stockRepo.findById(stocksymbol)
                 .orElseThrow(() -> new RuntimeException("No stock found"));
 
+        BigDecimal totalPrice =
+                stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
 
-        BigDecimal totalPrice = stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
-        if(user.getAmount().compareTo(totalPrice)<=0)
-        {
+        if (user.getAmount().compareTo(totalPrice) < 0) {
             throw new RuntimeException("Insufficient funds");
         }
+
+        // Optimistic locking protection happens here
         user.setAmount(user.getAmount().subtract(totalPrice));
 
-        userRepo.save(user);
-        PortfolioItem item = portfolioItemRepo.findByUser_UserIdAndStocksymbol(user.getUserId(),stocksymbol);
-        if(item==null)
-        {
-            item = new  PortfolioItem();
+        PortfolioItem item =
+                portfolioItemRepo.findByUser_UserIdAndStocksymbol(
+                        user.getUserId(), stocksymbol);
+
+        if (item == null) {
+            item = new PortfolioItem();
             item.setUser(user);
             item.setStock(stock);
             item.setStocksymbol(stocksymbol);
             item.setQuantity(quantity);
             item.setAveragebuyprice(stock.getCurrentprice());
+        } else {
 
-        }
-        else
-        {
             int oldQty = item.getQuantity();
-            BigDecimal oldPrice = item.getAveragebuyprice().multiply(BigDecimal.valueOf(oldQty));
-            BigDecimal newPrice = stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
+
+            BigDecimal oldTotal =
+                    item.getAveragebuyprice()
+                            .multiply(BigDecimal.valueOf(oldQty));
+
+            BigDecimal newTotal =
+                    stock.getCurrentprice()
+                            .multiply(BigDecimal.valueOf(quantity));
+
             int newQty = oldQty + quantity;
-            BigDecimal newAvg = oldPrice.add(newPrice).divide(BigDecimal.valueOf(newQty), 2, RoundingMode.HALF_UP);
+
+            BigDecimal newAvg =
+                    oldTotal.add(newTotal)
+                            .divide(BigDecimal.valueOf(newQty),
+                                    2,
+                                    RoundingMode.HALF_UP);
+
             item.setQuantity(newQty);
             item.setAveragebuyprice(newAvg);
         }
 
         portfolioItemRepo.save(item);
-        Transaction tnx = new Transaction() ;
+
+        Transaction tnx = new Transaction();
         tnx.setUser(user);
         tnx.setQuantity(quantity);
         tnx.setStocksymbol(stocksymbol);
@@ -85,37 +109,26 @@ public class TransactionService {
         tnx.setTimestamp(LocalDateTime.now());
         tnx.setCurrentprice(stock.getCurrentprice());
         tnx.setTotalAmount(totalPrice);
+
         transactionRepo.save(tnx);
-
-
-
-
-                
-
-
-
     }
-
+    @Transactional
     public void sellStock(Long id, String stocksymbol, int quantity) {
 
-        // 0. Basic validation
         if (quantity <= 0) {
             throw new RuntimeException("Quantity must be greater than zero");
         }
 
-        // 1. Get User
         User user = userRepo.findByUserId(id)
                 .orElseThrow(() -> new RuntimeException(
                         "User not found with ID: " + id
                 ));
 
-        // 2. Get Stock
         Stock stock = stockRepo.findById(stocksymbol)
                 .orElseThrow(() -> new RuntimeException(
                         "No stock found with symbol: " + stocksymbol
                 ));
 
-        // 3. Get PortfolioItem FIRST (ownership + quantity check)
         PortfolioItem item = portfolioItemRepo
                 .findByUser_UserIdAndStocksymbol(id, stocksymbol);
 
@@ -123,15 +136,12 @@ public class TransactionService {
             throw new RuntimeException("Insufficient stock to sell");
         }
 
-        // 4. Calculate total sell value
         BigDecimal totalPrice =
                 stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
 
-        // 5. Update User balance AFTER validation
+        // Optimistic locking happens here
         user.setAmount(user.getAmount().add(totalPrice));
-        userRepo.save(user);
 
-        // 6. Update PortfolioItem
         int remainingQty = item.getQuantity() - quantity;
 
         if (remainingQty <= 0) {
@@ -141,7 +151,6 @@ public class TransactionService {
             portfolioItemRepo.save(item);
         }
 
-        // 7. Save Transaction
         Transaction tnx = new Transaction();
         tnx.setUser(user);
         tnx.setStocksymbol(stocksymbol);
@@ -153,8 +162,6 @@ public class TransactionService {
 
         transactionRepo.save(tnx);
     }
-
-
 
     public List<Transaction> getuserHistory(Long id) {
         return transactionRepo.findByUser_UserId(id);
