@@ -254,14 +254,18 @@ public class StockPriceController {
 
                 Map<String, Object> body = response.getBody();
 
-                if (body != null && body.get("price") != null) {
+                if (body != null && body.get("close") != null) {
+
+                    double close = Double.parseDouble(body.get("close").toString());
+                    double change = Double.parseDouble(body.get("change").toString());
+                    double percentChange = Double.parseDouble(body.get("percent_change").toString());
 
                     Map<String, Object> stockData = new HashMap<>();
-                    stockData.put("symbol", body.get("symbol"));
-                    stockData.put("price", body.get("price"));
-                    stockData.put("change", body.get("change"));
-                    stockData.put("percentChange", body.get("percent_change"));
-                    stockData.put("name", body.get("name")); // FULL NAME
+                    stockData.put("stocksymbol", body.get("symbol"));
+                    stockData.put("companyname", body.get("name"));
+                    stockData.put("price", close);
+                    stockData.put("change", change);
+                    stockData.put("percentChange", percentChange);
 
                     result.add(stockData);
                 }
