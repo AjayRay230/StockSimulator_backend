@@ -53,13 +53,13 @@ public class StockService {
 
 
 
-    @Transactional
+
     @Cacheable(value = "suggestions", key = "#query.trim().toLowerCase()")
     public List<Stock> SearchStock(String query) {
-
+        System.out.println("EXECUTING DB LOGIC - SearchStock");
         String normalized = query.trim();
 
-        // 1️⃣ Search DB first
+
         List<Stock> bySymbol =
                 stockRepo.findBySymbolContainingIgnoreCase(normalized);
 
@@ -75,7 +75,7 @@ public class StockService {
             return new ArrayList<>(combined);
         }
 
-        // 2️⃣ Fetch from TwelveData
+
         List<Stock> external =
                 twelveDataService.fetchSuggestionsFromTwelve(normalized);
 
@@ -101,7 +101,7 @@ public class StockService {
     }
     @Cacheable(value = "stockSearch", key = "#query.trim().toLowerCase()")
     public Stock findStockBySymbolOrCompanyName(String query) {
-
+        System.out.println("EXECUTING DB LOGIC - SearchStock");
         List<Stock> results =
                 stockRepo.searchStockLike(query.trim(), PageRequest.of(0, 10));
 
