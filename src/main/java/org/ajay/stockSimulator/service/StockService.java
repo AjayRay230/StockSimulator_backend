@@ -2,16 +2,20 @@ package org.ajay.stockSimulator.service;
 
 import jakarta.transaction.Transactional;
 import org.ajay.stockSimulator.Repo.StockRepo;
+import org.ajay.stockSimulator.events.PriceUpdatedEvent;
 import org.ajay.stockSimulator.model.Stock;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import org.springframework.data.domain.PageRequest;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,7 +30,8 @@ public class StockService {
 
     @Autowired
     private TwelveDataService twelveDataService;
-
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
     public List<Stock> getAllStocksWithPrice(BigDecimal currentprice) {
        return  stockRepo.findByCurrentprice(currentprice);
     }
@@ -39,18 +44,30 @@ public class StockService {
     @Transactional
     @CacheEvict(value = {"stocks", "stockSearch", "suggestions"}, allEntries = true)
     public void simulatePrice() {
-        //simulate by random price change plus_minus 10%;
+
         List<Stock> stocks = stockRepo.findAll();
+        List<String> updatedSymbols = new ArrayList<>();
+
         for (Stock stock : stocks) {
+
             BigDecimal currentPrice = stock.getCurrentprice();
-            double factor = 0.9 + Math.random()*0.2 ;//0.9 to 1.1
-            BigDecimal newPrice = currentPrice.multiply(BigDecimal.valueOf(factor));
-            stock.setCurrentprice(newPrice.setScale(2, BigDecimal.ROUND_HALF_UP));
+            double factor = 0.9 + Math.random() * 0.2;
+
+            BigDecimal newPrice = currentPrice
+                    .multiply(BigDecimal.valueOf(factor))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            stock.setCurrentprice(newPrice);
+            updatedSymbols.add(stock.getSymbol());
         }
+
         stockRepo.saveAll(stocks);
 
+        // 🔥 Publish event
+        eventPublisher.publishEvent(
+                new PriceUpdatedEvent(updatedSymbols)
+        );
     }
-
 
 
 
@@ -85,14 +102,16 @@ public class StockService {
 
         for (Stock stock : external) {
 
-            // Avoid duplicate insert
-            if (!stockRepo.existsById(stock.getSymbol())) {
+            stock.setSymbol(stock.getSymbol().toUpperCase());
+
+            try {
                 stockRepo.save(stock);
+            } catch (DataIntegrityViolationException ignored) {
+                // already inserted by another request
             }
 
             combined.add(stock);
         }
-
         return new ArrayList<>(combined);
     }
 
