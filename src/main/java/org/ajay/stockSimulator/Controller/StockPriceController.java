@@ -171,7 +171,6 @@ public class StockPriceController {
                     double prevClose = Double.parseDouble(prev.get("close"));
                     double change = close - prevClose;
                     double changePercent = (change / prevClose) * 100;
-
                     String trend = change >= 0 ? "up" : "down";
 
                     // Build OHLC data
@@ -189,16 +188,27 @@ public class StockPriceController {
                                     ))
                                     .collect(Collectors.toList());
 
-                    // Extract symbol safely from API response
-                    String companyname = stocksymbol;
 
-                    if (body.containsKey("meta")) {
-                        Map<String, Object> metaData =
-                                (Map<String, Object>) body.get("meta");
+                    String companyname = stocksymbol; // fallback
 
-                        if (metaData.get("symbol") != null) {
-                            companyname = (String) metaData.get("symbol");
+                    try {
+                        String quoteUrl = String.format(
+                                "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
+                                stocksymbol, API_key
+                        );
+
+                        ResponseEntity<Map> quoteResponse =
+                                restTemplate.getForEntity(quoteUrl, Map.class);
+
+                        Map<String, Object> quoteBody = quoteResponse.getBody();
+
+                        if (quoteBody != null && quoteBody.get("name") != null) {
+                            companyname = (String) quoteBody.get("name");
                         }
+
+                    } catch (Exception ex) {
+                        // Silent fallback — DO NOT break production
+                        companyname = stocksymbol;
                     }
 
                     // Final response
