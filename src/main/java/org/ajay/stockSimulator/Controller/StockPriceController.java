@@ -158,10 +158,12 @@ public class StockPriceController {
             Map<String, Object> body = response.getBody();
 
             if (body != null && body.containsKey("values")) {
-                List<Map<String, String>> values = (List<Map<String, String>>) body.get("values");
+
+                List<Map<String, String>> values =
+                        (List<Map<String, String>>) body.get("values");
 
                 if (values.size() >= 2) {
-                    // Latest & previous prices for meta info
+
                     Map<String, String> latest = values.get(0);
                     Map<String, String> prev = values.get(1);
 
@@ -172,33 +174,51 @@ public class StockPriceController {
 
                     String trend = change >= 0 ? "up" : "down";
 
-                    // OHLC history for chart
-                    List<Map<String, ? extends Serializable>> ohlcData = values.stream()
-                            .map(v -> Map.of(
-                                    "timestamp", v.get("datetime"),
-                                    "openPrice", Double.parseDouble(v.get("open")),
-                                    "highPrice", Double.parseDouble(v.get("high")),
-                                    "lowPrice", Double.parseDouble(v.get("low")),
-                                    "closePrice", Double.parseDouble(v.get("close")),
-                                    "volume", v.containsKey("volume") ? Double.parseDouble(v.get("volume")) : 0.0
-                            ))
-                            .collect(Collectors.toList());
+                    // Build OHLC data
+                    List<Map<String, ? extends Serializable>> ohlcData =
+                            values.stream()
+                                    .map(v -> Map.of(
+                                            "timestamp", v.get("datetime"),
+                                            "openPrice", Double.parseDouble(v.get("open")),
+                                            "highPrice", Double.parseDouble(v.get("high")),
+                                            "lowPrice", Double.parseDouble(v.get("low")),
+                                            "closePrice", Double.parseDouble(v.get("close")),
+                                            "volume", v.containsKey("volume")
+                                                    ? Double.parseDouble(v.get("volume"))
+                                                    : 0.0
+                                    ))
+                                    .collect(Collectors.toList());
 
-                    // Prepare final response
+                    // Extract symbol safely from API response
+                    String companyname = stocksymbol;
+
+                    if (body.containsKey("meta")) {
+                        Map<String, Object> metaData =
+                                (Map<String, Object>) body.get("meta");
+
+                        if (metaData.get("symbol") != null) {
+                            companyname = (String) metaData.get("symbol");
+                        }
+                    }
+
+                    // Final response
                     Map<String, Object> result = new HashMap<>();
                     result.put("meta", Map.of(
                             "symbol", stocksymbol,
+                            "companyname", companyname,
                             "currentPrice", close,
                             "change", change,
                             "changePercent", changePercent,
                             "timestamp", latest.get("datetime"),
                             "trend", trend
                     ));
+
                     result.put("data", ohlcData);
 
                     return ResponseEntity.ok(result);
                 }
             }
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", "Exception: " + e.getMessage()));
