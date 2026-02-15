@@ -1,5 +1,6 @@
 package org.ajay.stockSimulator.service;
 
+import jakarta.transaction.Transactional;
 import org.ajay.stockSimulator.Repo.StockRepo;
 import org.ajay.stockSimulator.model.Stock;
 
@@ -8,9 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 ;
 
 @Service
@@ -47,38 +50,46 @@ public class StockService {
 
 
 
+    @Transactional
     public List<Stock> SearchStock(String query) {
 
-        query = query.trim();
+        String normalized = query.trim();
 
-        List<Stock> localResults =
-                stockRepo.searchStockLike(query, PageRequest.of(0, 10));
+        // 1️⃣ Search DB first
+        List<Stock> bySymbol =
+                stockRepo.findBySymbolContainingIgnoreCase(normalized);
 
-        if (!localResults.isEmpty()) {
-            return localResults;
+        List<Stock> byName =
+                stockRepo.findByCompanynameContainingIgnoreCase(normalized);
+
+        Set<Stock> combined = new LinkedHashSet<>();
+        combined.addAll(bySymbol);
+        combined.addAll(byName);
+
+        // If DB already has enough results → return
+        if (combined.size() >= 5) {
+            return new ArrayList<>(combined);
         }
 
-        try {
-            Stock externalStock = twelveDataService.fetchFromTwelve(query);
+        // 2️⃣ Fetch from TwelveData
+        List<Stock> external =
+                twelveDataService.fetchSuggestionsFromTwelve(normalized);
 
-            if (externalStock != null) {
+        if (external == null || external.isEmpty()) {
+            return new ArrayList<>(combined);
+        }
 
-                externalStock.setSymbol(
-                        externalStock.getSymbol().toUpperCase()
-                );
+        for (Stock stock : external) {
 
-                if (!stockRepo.existsById(externalStock.getSymbol())) {
-                    stockRepo.save(externalStock);
-                }
-
-                return List.of(externalStock);
+            // Avoid duplicate insert
+            if (!stockRepo.existsById(stock.getSymbol())) {
+                stockRepo.save(stock);
             }
 
-        } catch (Exception e) {
-            // optional logging
+            combined.add(stock);
         }
 
-        return List.of();
+        return new ArrayList<>(combined);
     }
 
     public List<Stock> getAllStocks() {

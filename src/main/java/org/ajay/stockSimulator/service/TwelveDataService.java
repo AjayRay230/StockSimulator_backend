@@ -48,5 +48,42 @@ public class TwelveDataService {
 
         return stock;
     }
+    public List<Stock> fetchSuggestionsFromTwelve(String query) {
 
+        String url = "https://api.twelvedata.com/symbol_search?symbol="
+                + query + "&apikey=" + apiKey;
+
+        Map response = restTemplate.getForObject(url, Map.class);
+
+        if (response == null || response.get("data") == null) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> data =
+                (List<Map<String, Object>>) response.get("data");
+
+        List<Stock> stocks = new ArrayList<>();
+
+        for (Map<String, Object> item : data) {
+
+            // Filter only real stocks
+            if (!"Common Stock".equals(item.get("instrument_type"))) {
+                continue;
+            }
+
+            String symbol = (String) item.get("symbol");
+            String name = (String) item.get("instrument_name");
+
+            Stock stock = new Stock();
+            stock.setSymbol(symbol.toUpperCase());
+            stock.setCompanyname(name);
+            stock.setCurrentprice(BigDecimal.ZERO);
+            stock.setChangepercent(BigDecimal.ZERO);
+            stock.setLastupdate(LocalDateTime.now());
+
+            stocks.add(stock);
+        }
+
+        return stocks;
+    }
 }
