@@ -6,6 +6,8 @@ import org.ajay.stockSimulator.model.Stock;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import org.springframework.data.domain.PageRequest;
@@ -24,15 +26,18 @@ public class StockService {
 
     @Autowired
     private TwelveDataService twelveDataService;
+
     public List<Stock> getAllStocksWithPrice(BigDecimal currentprice) {
        return  stockRepo.findByCurrentprice(currentprice);
     }
 
+    @Cacheable(value = "stocks", key = "#symbol.toUpperCase()")
     public Stock getStockWithSymbol(String symbol) {
-        return stockRepo.findById(symbol.toUpperCase()).orElseThrow(()-> new RuntimeException("Stock not found" + symbol));
-
+        return stockRepo.findById(symbol.toUpperCase())
+                .orElseThrow(() -> new RuntimeException("Stock not found " + symbol));
     }
-
+    @Transactional
+    @CacheEvict(value = {"stocks", "stockSearch", "suggestions"}, allEntries = true)
     public void simulatePrice() {
         //simulate by random price change plus_minus 10%;
         List<Stock> stocks = stockRepo.findAll();
@@ -48,9 +53,8 @@ public class StockService {
 
 
 
-
-
     @Transactional
+    @Cacheable(value = "suggestions", key = "#query.trim().toLowerCase()")
     public List<Stock> SearchStock(String query) {
 
         String normalized = query.trim();
@@ -95,6 +99,7 @@ public class StockService {
     public List<Stock> getAllStocks() {
         return stockRepo.findAll();
     }
+    @Cacheable(value = "stockSearch", key = "#query.trim().toLowerCase()")
     public Stock findStockBySymbolOrCompanyName(String query) {
 
         List<Stock> results =
