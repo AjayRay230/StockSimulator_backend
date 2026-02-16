@@ -1,7 +1,10 @@
 package org.ajay.stockSimulator.events;
 
+import lombok.Getter;
+
 import java.util.List;
 
+@Getter
 public class PriceUpdatedEvent {
 
     private final List<String> updatedSymbols;
@@ -10,7 +13,4 @@ public class PriceUpdatedEvent {
         this.updatedSymbols = updatedSymbols;
     }
 
-    public List<String> getUpdatedSymbols() {
-        return updatedSymbols;
-    }
 }
