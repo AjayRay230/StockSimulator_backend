@@ -4,6 +4,7 @@ import org.ajay.stockSimulator.model.LimitOrder;
 import org.ajay.stockSimulator.model.OrderStatus;
 import org.ajay.stockSimulator.model.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
@@ -30,5 +31,6 @@ public interface LimitOrderRepo
             OrderStatus status
     );
 
+    @Query("SELECT DISTINCT l.stockSymbol FROM LimitOrder l")
     List<String> findDistinctSymbols();
 }
