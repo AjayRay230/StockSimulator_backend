@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 ;
 
 @Service
@@ -46,7 +43,7 @@ public class StockService {
     public void simulatePrice() {
 
         List<Stock> stocks = stockRepo.findAll();
-        List<String> updatedSymbols = new ArrayList<>();
+        Map<String, Double> updatedPrices = new HashMap<>();
 
         for (Stock stock : stocks) {
 
@@ -58,17 +55,21 @@ public class StockService {
                     .setScale(2, RoundingMode.HALF_UP);
 
             stock.setCurrentprice(newPrice);
-            updatedSymbols.add(stock.getSymbol());
+
+            // 🔥 Store symbol + price
+            updatedPrices.put(
+                    stock.getSymbol(),
+                    newPrice.doubleValue()
+            );
         }
 
         stockRepo.saveAll(stocks);
 
-        // 🔥 Publish event
+        // 🔥 Publish event with prices
         eventPublisher.publishEvent(
-                new PriceUpdatedEvent(updatedSymbols)
+                new PriceUpdatedEvent(updatedPrices)
         );
     }
-
 
 
     @Cacheable(value = "suggestions", key = "#query.trim().toLowerCase()")

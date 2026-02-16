@@ -100,4 +100,23 @@ public class PortfolioItemService {
         }
         return item;
     }
+
+    public double calculateTotalPortfolioValue(User user) {
+
+        List<PortfolioItem> holdings =
+                portfolioItemRepo.findByUser(user);
+
+        double total = 0.0;
+
+        for (PortfolioItem holding : holdings) {
+            total += holding.getQuantity()
+                    * holding.getStock().getCurrentprice().doubleValue();
+        }
+
+        return total;
+    }
+
+    public List<User> findUsersWithPortfolio() {
+        return portfolioItemRepo.findDistinctUsersWithPortfolio();
+    }
 }
