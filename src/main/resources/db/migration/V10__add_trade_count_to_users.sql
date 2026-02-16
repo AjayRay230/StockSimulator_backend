@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN trade_count BIGINT DEFAULT 0;
