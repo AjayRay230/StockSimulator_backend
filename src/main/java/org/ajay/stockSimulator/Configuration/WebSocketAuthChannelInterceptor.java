@@ -26,6 +26,10 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor =
                 MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
+        if (accessor == null) {
+            return message;
+        }
+
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
 
             String authHeader = accessor.getFirstNativeHeader("Authorization");
@@ -35,6 +39,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             }
 
             String token = authHeader.substring(7);
+
             String username = jwtService.extractUsername(token);
 
             if (username == null) {
@@ -43,6 +48,11 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
             UserDetails userDetails =
                     userDetailsService.loadUserByUsername(username);
+
+            // 🔥 THIS IS THE CRITICAL FIX
+            if (!jwtService.validateToken(token, userDetails)) {
+                throw new IllegalArgumentException("JWT expired or invalid");
+            }
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
