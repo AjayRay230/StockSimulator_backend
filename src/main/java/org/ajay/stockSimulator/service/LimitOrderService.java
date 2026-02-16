@@ -5,6 +5,7 @@ import org.ajay.stockSimulator.Repo.StockRepo;
 import org.ajay.stockSimulator.Repo.UserRepo;
 import org.ajay.stockSimulator.model.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @EnableScheduling
@@ -25,7 +28,8 @@ public class LimitOrderService {
     private  TransactionService transactionService;
     @Autowired
     private  UserRepo userRepo;
-
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     public LimitOrder placeLimitOrder(String username,
                                       String stockSymbol,
                                       Integer quantity,
@@ -188,7 +192,6 @@ public class LimitOrderService {
             LimitOrder buy = buyOrders.get(i);
             LimitOrder sell = sellOrders.get(j);
 
-            //  Price match condition
             if (buy.getPrice().compareTo(sell.getPrice()) < 0) {
                 break;
             }
@@ -198,7 +201,6 @@ public class LimitOrderService {
                     sell.getRemainingQuantity()
             );
 
-            //  Match at sell price (standard exchange rule)
             BigDecimal executionPrice = sell.getPrice();
 
             transactionService.settleMatchedTrade(
@@ -209,7 +211,6 @@ public class LimitOrderService {
                     executionPrice
             );
 
-            // Update remaining quantities
             buy.setRemainingQuantity(
                     buy.getRemainingQuantity() - tradeQty
             );
@@ -218,7 +219,6 @@ public class LimitOrderService {
                     sell.getRemainingQuantity() - tradeQty
             );
 
-            // Update order statuses
             if (buy.getRemainingQuantity() == 0) {
                 buy.setStatus(OrderStatus.EXECUTED);
                 i++;
@@ -236,6 +236,44 @@ public class LimitOrderService {
             orderRepo.save(buy);
             orderRepo.save(sell);
         }
+
+        //  ADD THIS BLOCK AT END
+
+        List<LimitOrder> remainingOrders =
+                orderRepo.findByStockSymbolAndStatus(
+                        symbol,
+                        OrderStatus.PENDING
+                );
+        List<Map<String, Object>> bids = remainingOrders.stream()
+                .filter(o -> o.getType() == TransactionType.BUY)
+                .sorted((a, b) -> b.getPrice().compareTo(a.getPrice()))
+                .map(o -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("price", o.getPrice());
+                    map.put("quantity", o.getRemainingQuantity());
+                    return map;
+                })
+                .toList();
+
+        List<Map<String, Object>> asks = remainingOrders.stream()
+                .filter(o -> o.getType() == TransactionType.SELL)
+                .sorted((a, b) -> a.getPrice().compareTo(b.getPrice()))
+                .map(o -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("price", o.getPrice());
+                    map.put("quantity", o.getRemainingQuantity());
+                    return map;
+                })
+                .toList();
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bids", bids);
+        payload.put("asks", asks);
+
+        messagingTemplate.convertAndSend(
+                "/topic/orderbook/" + symbol,
+                payload
+        );
     }
 
 
