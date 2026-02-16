@@ -44,7 +44,7 @@ public class SpringConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/user/register",
-                                "/api/user/login","/h2-console/**","/api/user/forgot-password","/api/user/reset-password","/ws/**"
+                                "/api/user/login","/h2-console/**","/api/user/forgot-password","/api/user/reset-password","/ws/**","/actuator/**"
 
                         ).permitAll()
                         .requestMatchers("/api/user/add","/api/admin/**").hasRole("ADMIN")

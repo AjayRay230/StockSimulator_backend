@@ -1,5 +1,6 @@
 package org.ajay.stockSimulator.service;
 
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.ajay.stockSimulator.Repo.PortfolioItemRepo;
@@ -86,5 +87,16 @@ PasswordEncoder passwordEncoder;
     public Double getPortfolioValue(long id) {
         Double value  = portfolioItemRepo.getUserPortfolioValue(id);
         return value!=null?value:0.0;
+    }
+
+    @Transactional
+    public void incrementTradeCount(Long userId) {
+
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setTradeCount(user.getTradeCount() + 1);
+
+        userRepo.save(user);
     }
 }

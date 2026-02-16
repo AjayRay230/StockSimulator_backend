@@ -4,6 +4,7 @@ import org.ajay.stockSimulator.DTOs.ActiveTraderDTO;
 import org.ajay.stockSimulator.DTOs.RecentTradeDTO;
 import org.ajay.stockSimulator.DTOs.TopStockDTO;
 import org.ajay.stockSimulator.DTOs.TradersExecutedDTO;
+import org.ajay.stockSimulator.events.TradePlacedEvent;
 import org.ajay.stockSimulator.model.*;
 import org.ajay.stockSimulator.Repo.PortfolioItemRepo;
 import org.ajay.stockSimulator.Repo.StockRepo;
@@ -11,6 +12,7 @@ import org.ajay.stockSimulator.Repo.TransactionRepo;
 import org.ajay.stockSimulator.Repo.UserRepo;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -34,10 +36,9 @@ public class TransactionService {
     private PortfolioItemRepo portfolioItemRepo;
     @Autowired
     private UserRepo userRepo;
-    public TransactionService(TransactionRepo transactionRepo, StockRepo stockRepo) {
-        this.transactionRepo = transactionRepo;
-        this.stockRepo = stockRepo;
-    }
+    @Autowired
+    private ApplicationEventPublisher publisher;
+
     @Transactional
     public void buyStock(String username,
                          String stocksymbol,
@@ -111,6 +112,18 @@ public class TransactionService {
         tnx.setTotalAmount(totalPrice);
 
         transactionRepo.save(tnx);
+
+
+        publisher.publishEvent(
+                new TradePlacedEvent(
+                        user.getUserId(),
+                        user.getUsername(),
+                        stocksymbol,
+                        quantity,
+                        stock.getCurrentprice().doubleValue(),
+                        TransactionType.BUY
+                )
+        );
     }
     @Transactional
     public void sellStock(Long id, String stocksymbol, int quantity) {
@@ -161,6 +174,18 @@ public class TransactionService {
         tnx.setTotalAmount(totalPrice);
 
         transactionRepo.save(tnx);
+
+        publisher.publishEvent(
+                new TradePlacedEvent(
+                        user.getUserId(),
+                        user.getUsername(),
+                        stocksymbol,
+                        quantity,
+                        stock.getCurrentprice().doubleValue(),
+                        TransactionType.SELL
+                )
+        );
+
     }
 
     public List<Transaction> getuserHistory(Long id) {
@@ -191,7 +216,7 @@ public class TransactionService {
                 .limit(limit)
                 .map(obj -> new TopStockDTO(
                         (String) obj[0],
-                        (Long) obj[1]   // ✅ keep as long
+                        (Long) obj[1]
                 ))
                 .collect(Collectors.toList());
     }
@@ -225,12 +250,145 @@ public class TransactionService {
                 .stream()
                 .limit(limit)
                 .map(obj -> new ActiveTraderDTO(
-                        (Long) obj[0],     // ✅ userId
-                        (String) obj[1],   // userName
-                        (String) obj[2],   // email
-                        (Long) obj[3]      // tradeCount
+                        (Long) obj[0],
+                        (String) obj[1],
+                        (String) obj[2],
+                        (Long) obj[3]
                 ))
                 .collect(Collectors.toList());
+    }
+
+
+    @Transactional
+    public void settleMatchedTrade(
+            String buyerUsername,
+            String sellerUsername,
+            String stockSymbol,
+            int quantity,
+            BigDecimal executionPrice
+    ) {
+
+        User buyer = userRepo.findByUsername(buyerUsername);
+        User seller = userRepo.findByUsername(sellerUsername);
+
+        if (buyer == null || seller == null) {
+            throw new RuntimeException("Buyer or seller not found");
+        }
+
+        BigDecimal totalPrice =
+                executionPrice.multiply(BigDecimal.valueOf(quantity));
+
+        //  Check buyer funds
+        if (buyer.getAmount().compareTo(totalPrice) < 0) {
+            throw new RuntimeException("Buyer has insufficient funds");
+        }
+
+        //  Deduct buyer
+        buyer.setAmount(buyer.getAmount().subtract(totalPrice));
+
+        //  Add seller
+        seller.setAmount(seller.getAmount().add(totalPrice));
+
+        //  Update buyer portfolio
+        PortfolioItem buyerItem =
+                portfolioItemRepo.findByUser_UserIdAndStocksymbol(
+                        buyer.getUserId(), stockSymbol);
+
+        if (buyerItem == null) {
+            buyerItem = new PortfolioItem();
+            buyerItem.setUser(buyer);
+            buyerItem.setStocksymbol(stockSymbol);
+            buyerItem.setQuantity(quantity);
+            buyerItem.setAveragebuyprice(executionPrice);
+        } else {
+
+            int oldQty = buyerItem.getQuantity();
+
+            BigDecimal oldTotal =
+                    buyerItem.getAveragebuyprice()
+                            .multiply(BigDecimal.valueOf(oldQty));
+
+            BigDecimal newTotal =
+                    executionPrice.multiply(BigDecimal.valueOf(quantity));
+
+            int newQty = oldQty + quantity;
+
+            BigDecimal newAvg =
+                    oldTotal.add(newTotal)
+                            .divide(BigDecimal.valueOf(newQty),
+                                    2,
+                                    RoundingMode.HALF_UP);
+
+            buyerItem.setQuantity(newQty);
+            buyerItem.setAveragebuyprice(newAvg);
+        }
+
+        portfolioItemRepo.save(buyerItem);
+
+        // Update seller portfolio
+        PortfolioItem sellerItem =
+                portfolioItemRepo.findByUser_UserIdAndStocksymbol(
+                        seller.getUserId(), stockSymbol);
+
+        if (sellerItem == null || sellerItem.getQuantity() < quantity) {
+            throw new RuntimeException("Seller insufficient shares");
+        }
+
+        int remaining = sellerItem.getQuantity() - quantity;
+
+        if (remaining == 0) {
+            portfolioItemRepo.delete(sellerItem);
+        } else {
+            sellerItem.setQuantity(remaining);
+            portfolioItemRepo.save(sellerItem);
+        }
+
+        //  Create BUY transaction
+        Transaction buyTxn = new Transaction();
+        buyTxn.setUser(buyer);
+        buyTxn.setStocksymbol(stockSymbol);
+        buyTxn.setQuantity(quantity);
+        buyTxn.setType(TransactionType.BUY);
+        buyTxn.setCurrentprice(executionPrice);
+        buyTxn.setTotalAmount(totalPrice);
+        buyTxn.setTimestamp(LocalDateTime.now());
+
+        transactionRepo.save(buyTxn);
+
+        //  Create SELL transaction
+        Transaction sellTxn = new Transaction();
+        sellTxn.setUser(seller);
+        sellTxn.setStocksymbol(stockSymbol);
+        sellTxn.setQuantity(quantity);
+        sellTxn.setType(TransactionType.SELL);
+        sellTxn.setCurrentprice(executionPrice);
+        sellTxn.setTotalAmount(totalPrice);
+        sellTxn.setTimestamp(LocalDateTime.now());
+
+        transactionRepo.save(sellTxn);
+
+        //  Publish events for both sides
+        publisher.publishEvent(
+                new TradePlacedEvent(
+                        buyer.getUserId(),
+                        buyer.getUsername(),
+                        stockSymbol,
+                        quantity,
+                        executionPrice.doubleValue(),
+                        TransactionType.BUY
+                )
+        );
+
+        publisher.publishEvent(
+                new TradePlacedEvent(
+                        seller.getUserId(),
+                        seller.getUsername(),
+                        stockSymbol,
+                        quantity,
+                        executionPrice.doubleValue(),
+                        TransactionType.SELL
+                )
+        );
     }
 
 }

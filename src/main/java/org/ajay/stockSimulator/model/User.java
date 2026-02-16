@@ -24,5 +24,6 @@ public class User {
    private String role;
     @Version
     private Long version;
+    private int tradeCount;
 
 }

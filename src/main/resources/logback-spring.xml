@@ -1,0 +1,7 @@
+<pattern>
+    {"timestamp":"%d{yyyy-MM-dd HH:mm:ss}",
+    "level":"%level",
+    "requestId":"%X{requestId}",
+    "user":"%X{userId}",
+    "message":"%msg"}%n
+</pattern>
