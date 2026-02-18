@@ -38,44 +38,82 @@ public class TransactionService {
     private UserRepo userRepo;
     @Autowired
     private ApplicationEventPublisher publisher;
-
+    @Autowired
+    private TwelveDataService twelveDataService;
     @Transactional
     public void buyStock(String username,
                          String stocksymbol,
                          Integer quantity) {
 
-        if (quantity <= 0) {
+        // 1. Validate quantity
+        if (quantity == null || quantity <= 0) {
             throw new RuntimeException("Quantity must be greater than zero");
         }
 
+        // 2. Normalize and validate symbol
+        if (stocksymbol == null) {
+            throw new RuntimeException("Invalid stock symbol");
+        }
+
+        stocksymbol = stocksymbol.trim().toUpperCase();
+
+        if (!stocksymbol.matches("^[A-Z]{1,5}$")) {
+            throw new RuntimeException("Invalid stock symbol");
+        }
+
+        // 3. Fetch user
         User user = userRepo.findByUsername(username);
         if (user == null) {
             throw new RuntimeException("User not found");
         }
+
+        // 4. Fetch stock
         Stock stock = stockRepo.findById(stocksymbol)
                 .orElseThrow(() -> new RuntimeException("No stock found"));
 
+        BigDecimal currentPrice = stock.getCurrentprice();
+
+        // 5. Ensure valid price (refresh if needed)
+        if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
+
+            BigDecimal livePrice = twelveDataService.fetchLivePrice(stocksymbol);
+
+            if (livePrice == null || livePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Stock price unavailable");
+            }
+
+            stock.setCurrentprice(livePrice);
+            stock.setLastupdate(LocalDateTime.now());
+            stockRepo.save(stock);
+
+            currentPrice = livePrice;
+        }
+
+        // 6. Calculate total cost
         BigDecimal totalPrice =
-                stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
+                currentPrice.multiply(BigDecimal.valueOf(quantity));
 
         if (user.getAmount().compareTo(totalPrice) < 0) {
             throw new RuntimeException("Insufficient funds");
         }
 
-        // Optimistic locking protection happens here
+        // 7. Deduct balance
         user.setAmount(user.getAmount().subtract(totalPrice));
 
+        // 8. Update portfolio
         PortfolioItem item =
                 portfolioItemRepo.findByUser_UserIdAndStocksymbol(
                         user.getUserId(), stocksymbol);
 
         if (item == null) {
+
             item = new PortfolioItem();
             item.setUser(user);
             item.setStock(stock);
             item.setStocksymbol(stocksymbol);
             item.setQuantity(quantity);
-            item.setAveragebuyprice(stock.getCurrentprice());
+            item.setAveragebuyprice(currentPrice);
+
         } else {
 
             int oldQty = item.getQuantity();
@@ -85,8 +123,7 @@ public class TransactionService {
                             .multiply(BigDecimal.valueOf(oldQty));
 
             BigDecimal newTotal =
-                    stock.getCurrentprice()
-                            .multiply(BigDecimal.valueOf(quantity));
+                    currentPrice.multiply(BigDecimal.valueOf(quantity));
 
             int newQty = oldQty + quantity;
 
@@ -102,46 +139,82 @@ public class TransactionService {
 
         portfolioItemRepo.save(item);
 
+        // 9. Save transaction
         Transaction tnx = new Transaction();
         tnx.setUser(user);
         tnx.setQuantity(quantity);
         tnx.setStocksymbol(stocksymbol);
         tnx.setType(TransactionType.BUY);
         tnx.setTimestamp(LocalDateTime.now());
-        tnx.setCurrentprice(stock.getCurrentprice());
+        tnx.setCurrentprice(currentPrice);
         tnx.setTotalAmount(totalPrice);
 
         transactionRepo.save(tnx);
 
-
+        // 10. Publish event
         publisher.publishEvent(
                 new TradePlacedEvent(
                         user.getUserId(),
                         user.getUsername(),
                         stocksymbol,
                         quantity,
-                        stock.getCurrentprice().doubleValue(),
+                        currentPrice.doubleValue(),
                         TransactionType.BUY
                 )
         );
     }
+
     @Transactional
     public void sellStock(Long id, String stocksymbol, int quantity) {
 
+        // 1. Validate quantity
         if (quantity <= 0) {
             throw new RuntimeException("Quantity must be greater than zero");
         }
 
+        // 2. Normalize and validate symbol
+        if (stocksymbol == null) {
+            throw new RuntimeException("Invalid stock symbol");
+        }
+
+        stocksymbol = stocksymbol.trim().toUpperCase();
+
+        if (!stocksymbol.matches("^[A-Z]{1,5}$")) {
+            throw new RuntimeException("Invalid stock symbol");
+        }
+
+        // 3. Fetch user
         User user = userRepo.findByUserId(id)
                 .orElseThrow(() -> new RuntimeException(
                         "User not found with ID: " + id
                 ));
 
+        // 4. Fetch stock
+        String finalStocksymbol = stocksymbol;
         Stock stock = stockRepo.findById(stocksymbol)
                 .orElseThrow(() -> new RuntimeException(
-                        "No stock found with symbol: " + stocksymbol
+                        "No stock found with symbol: " + finalStocksymbol
                 ));
 
+        BigDecimal currentPrice = stock.getCurrentprice();
+
+        // 5. Ensure valid price (refresh if needed)
+        if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
+
+            BigDecimal livePrice = twelveDataService.fetchLivePrice(stocksymbol);
+
+            if (livePrice == null || livePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Stock price unavailable");
+            }
+
+            stock.setCurrentprice(livePrice);
+            stock.setLastupdate(LocalDateTime.now());
+            stockRepo.save(stock);
+
+            currentPrice = livePrice;
+        }
+
+        // 6. Fetch portfolio item
         PortfolioItem item = portfolioItemRepo
                 .findByUser_UserIdAndStocksymbol(id, stocksymbol);
 
@@ -149,10 +222,11 @@ public class TransactionService {
             throw new RuntimeException("Insufficient stock to sell");
         }
 
+        // 7. Calculate total sale value
         BigDecimal totalPrice =
-                stock.getCurrentprice().multiply(BigDecimal.valueOf(quantity));
+                currentPrice.multiply(BigDecimal.valueOf(quantity));
 
-        // Optimistic locking happens here
+        // 8. Credit user balance
         user.setAmount(user.getAmount().add(totalPrice));
 
         int remainingQty = item.getQuantity() - quantity;
@@ -164,29 +238,31 @@ public class TransactionService {
             portfolioItemRepo.save(item);
         }
 
+        // 9. Save transaction
         Transaction tnx = new Transaction();
         tnx.setUser(user);
         tnx.setStocksymbol(stocksymbol);
         tnx.setQuantity(quantity);
         tnx.setType(TransactionType.SELL);
         tnx.setTimestamp(LocalDateTime.now());
-        tnx.setCurrentprice(stock.getCurrentprice());
+        tnx.setCurrentprice(currentPrice);
         tnx.setTotalAmount(totalPrice);
 
         transactionRepo.save(tnx);
 
+        // 10. Publish event
         publisher.publishEvent(
                 new TradePlacedEvent(
                         user.getUserId(),
                         user.getUsername(),
                         stocksymbol,
                         quantity,
-                        stock.getCurrentprice().doubleValue(),
+                        currentPrice.doubleValue(),
                         TransactionType.SELL
                 )
         );
-
     }
+
 
     public List<Transaction> getuserHistory(Long id) {
         return transactionRepo.findByUser_UserId(id);

@@ -26,13 +26,13 @@ public class PriceUpdateListener {
     @EventListener
     public void handlePriceUpdate(PriceUpdatedEvent event) {
 
-        // 1️⃣ Broadcast market prices
+        //  Broadcast market prices
         messagingTemplate.convertAndSend(
                 "/topic/prices",
                 event.getUpdatedPrices()
         );
 
-        // 2️⃣ Only recalc users who have holdings
+        // Only recalc users who have holdings
         List<User> usersWithHoldings =
                 portfolioService.findUsersWithPortfolio();
 

@@ -56,7 +56,7 @@ public class StockService {
 
             stock.setCurrentprice(newPrice);
 
-            // 🔥 Store symbol + price
+            //  Store symbol + price
             updatedPrices.put(
                     stock.getSymbol(),
                     newPrice.doubleValue()
@@ -65,7 +65,7 @@ public class StockService {
 
         stockRepo.saveAll(stocks);
 
-        // 🔥 Publish event with prices
+        //  Publish event with prices
         eventPublisher.publishEvent(
                 new PriceUpdatedEvent(updatedPrices)
         );

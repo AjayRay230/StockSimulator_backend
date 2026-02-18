@@ -16,12 +16,18 @@ public class TwelveDataService {
 
     @Value("${twelvedata.api.key}")
     private String apiKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
+    // ================================
+    // Fetch FULL stock (used for search/buy)
+    // ================================
     public Stock fetchFromTwelve(String query) {
 
+        String normalized = query.trim().toUpperCase();
+
         String url = "https://api.twelvedata.com/symbol_search?symbol="
-                + query + "&apikey=" + apiKey;
+                + normalized + "&apikey=" + apiKey;
 
         Map response = restTemplate.getForObject(url, Map.class);
 
@@ -39,19 +45,36 @@ public class TwelveDataService {
         String symbol = (String) bestMatch.get("symbol");
         String name = (String) bestMatch.get("instrument_name");
 
+        if (symbol == null || !symbol.matches("^[A-Z]{1,5}$")) {
+            return null; // prevent corrupted symbols like 4NVDA
+        }
+
+        // Fetch real price (critical fix)
+        BigDecimal livePrice = fetchLivePrice(symbol);
+
+        if (livePrice == null || livePrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null; // do NOT create zero-price stocks
+        }
+
         Stock stock = new Stock();
-        stock.setSymbol(symbol);
+        stock.setSymbol(symbol.toUpperCase());
         stock.setCompanyname(name);
-        stock.setCurrentprice(BigDecimal.ZERO);
-        stock.setChangepercent(BigDecimal.ZERO);
+        stock.setCurrentprice(livePrice);
+        stock.setChangepercent(BigDecimal.ZERO); // unchanged behavior
         stock.setLastupdate(LocalDateTime.now());
 
         return stock;
     }
+
+    // ================================
+    // Fetch suggestions (autocomplete only)
+    // ================================
     public List<Stock> fetchSuggestionsFromTwelve(String query) {
 
+        String normalized = query.trim().toUpperCase();
+
         String url = "https://api.twelvedata.com/symbol_search?symbol="
-                + query + "&apikey=" + apiKey;
+                + normalized + "&apikey=" + apiKey;
 
         Map response = restTemplate.getForObject(url, Map.class);
 
@@ -66,7 +89,6 @@ public class TwelveDataService {
 
         for (Map<String, Object> item : data) {
 
-            // Filter only real stocks
             if (!"Common Stock".equals(item.get("instrument_type"))) {
                 continue;
             }
@@ -74,10 +96,16 @@ public class TwelveDataService {
             String symbol = (String) item.get("symbol");
             String name = (String) item.get("instrument_name");
 
+            if (symbol == null || !symbol.matches("^[A-Z]{1,5}$")) {
+                continue; // prevent invalid symbols
+            }
+
             Stock stock = new Stock();
             stock.setSymbol(symbol.toUpperCase());
             stock.setCompanyname(name);
-            stock.setCurrentprice(BigDecimal.ZERO);
+
+            // IMPORTANT: do NOT assign zero price
+            stock.setCurrentprice(null);
             stock.setChangepercent(BigDecimal.ZERO);
             stock.setLastupdate(LocalDateTime.now());
 
@@ -85,5 +113,26 @@ public class TwelveDataService {
         }
 
         return stocks;
+    }
+
+    // ================================
+    // Live price fetcher (new helper)
+    // ================================
+    BigDecimal fetchLivePrice(String symbol) {
+
+        String url = "https://api.twelvedata.com/price?symbol="
+                + symbol + "&apikey=" + apiKey;
+
+        Map response = restTemplate.getForObject(url, Map.class);
+
+        if (response == null || response.get("price") == null) {
+            return null;
+        }
+
+        try {
+            return new BigDecimal(response.get("price").toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
