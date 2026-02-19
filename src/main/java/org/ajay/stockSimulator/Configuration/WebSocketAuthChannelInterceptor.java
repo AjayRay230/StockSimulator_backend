@@ -49,7 +49,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             UserDetails userDetails =
                     userDetailsService.loadUserByUsername(username);
 
-            // 🔥 THIS IS THE CRITICAL FIX
+            //  THIS IS THE CRITICAL FIX
             if (!jwtService.validateToken(token, userDetails)) {
                 throw new IllegalArgumentException("JWT expired or invalid");
             }

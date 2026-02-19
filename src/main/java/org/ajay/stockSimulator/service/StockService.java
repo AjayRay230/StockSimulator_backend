@@ -48,6 +48,12 @@ public class StockService {
         for (Stock stock : stocks) {
 
             BigDecimal currentPrice = stock.getCurrentprice();
+
+            if (currentPrice == null) {
+                currentPrice = BigDecimal.valueOf(100);
+                stock.setCurrentprice(currentPrice);
+            }
+
             double factor = 0.9 + Math.random() * 0.2;
 
             BigDecimal newPrice = currentPrice
@@ -56,7 +62,6 @@ public class StockService {
 
             stock.setCurrentprice(newPrice);
 
-            //  Store symbol + price
             updatedPrices.put(
                     stock.getSymbol(),
                     newPrice.doubleValue()
@@ -65,7 +70,6 @@ public class StockService {
 
         stockRepo.saveAll(stocks);
 
-        //  Publish event with prices
         eventPublisher.publishEvent(
                 new PriceUpdatedEvent(updatedPrices)
         );
