@@ -99,4 +99,15 @@ PasswordEncoder passwordEncoder;
 
         userRepo.save(user);
     }
+
+    public User findByUsername(String username) {
+        User user = userRepo.findByUsername(username);
+
+        if (user == null) {
+            throw new RuntimeException("User not found: " + username);
+        }
+
+        return user;
+    }
+
 }

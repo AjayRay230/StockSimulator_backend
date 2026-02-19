@@ -2,11 +2,13 @@ package org.ajay.stockSimulator.Controller;
 
 import org.ajay.stockSimulator.DTOs.AuthRequest;
 import org.ajay.stockSimulator.DTOs.AuthResponseDTO;
+import org.ajay.stockSimulator.DTOs.DashboardMetricsDTO;
 import org.ajay.stockSimulator.DTOs.RegistrationRequest;
 import org.ajay.stockSimulator.Repo.UserRepo;
 import org.ajay.stockSimulator.model.User;
 import org.ajay.stockSimulator.service.JWTService;
 import org.ajay.stockSimulator.service.PasswordResetService;
+import org.ajay.stockSimulator.service.PortfolioItemService;
 import org.ajay.stockSimulator.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -41,7 +43,8 @@ public class UserController {
     PasswordEncoder passwordEncoder;
     @Autowired
     PasswordResetService passwordResetService;
-
+    @Autowired
+    private PortfolioItemService portfolioItemService;
     @GetMapping("/greeting")
     public String greeting(){
         return "Hello User you're inside the user controller right now";
@@ -206,6 +209,18 @@ public class UserController {
         return ResponseEntity.ok("Password updated successfully");
     }
 
+    @GetMapping("/me/dashboard-metrics")
+    public ResponseEntity<DashboardMetricsDTO> getMetrics(
+            @RequestParam String symbol,
+            Principal principal) {
+
+        User user = userService.findByUsername(principal.getName());
+
+        DashboardMetricsDTO dto =
+                portfolioItemService.getDashboardMetrics(user, symbol);
+
+        return ResponseEntity.ok(dto);
+    }
 
 }
 
