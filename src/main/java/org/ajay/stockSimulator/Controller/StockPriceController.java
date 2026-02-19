@@ -168,7 +168,7 @@ public class StockPriceController {
                     restTemplate.getForEntity(url, Map.class);
 
             Map<String, Object> body = response.getBody();
-
+            System.out.println("TD Response: " + body);
             if (body == null || !body.containsKey("values")) {
                 return buildEmptyResponse(stocksymbol);
             }
