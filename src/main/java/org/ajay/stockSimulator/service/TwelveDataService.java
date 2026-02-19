@@ -118,7 +118,7 @@ public class TwelveDataService {
     // ================================
     // Live price fetcher (new helper)
     // ================================
-    BigDecimal fetchLivePrice(String symbol) {
+  public   BigDecimal fetchLivePrice(String symbol) {
 
         String url = "https://api.twelvedata.com/price?symbol="
                 + symbol + "&apikey=" + apiKey;
