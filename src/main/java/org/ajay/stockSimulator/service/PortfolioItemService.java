@@ -180,5 +180,8 @@ public class PortfolioItemService {
                 tradesToday
         );
     }
+    public List<User> findUsersWithPortfolio() {
+        return portfolioItemRepo.findDistinctUsersWithPortfolio();
+    }
 
 }
