@@ -16,20 +16,26 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 @EnableScheduling
 public class LimitOrderService {
+
+    private static final Lock PROCESS_LOCK = new ReentrantLock();
+
     @Autowired
-    private  LimitOrderRepo orderRepo;
+    private LimitOrderRepo orderRepo;
     @Autowired
-    private  StockRepo stockRepo;
+    private StockRepo stockRepo;
     @Autowired
-    private  TransactionService transactionService;
+    private TransactionService transactionService;
     @Autowired
-    private  UserRepo userRepo;
+    private UserRepo userRepo;
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
     public LimitOrder placeLimitOrder(String username,
                                       String stockSymbol,
                                       Integer quantity,
@@ -48,97 +54,41 @@ public class LimitOrderService {
         return orderRepo.save(order);
     }
 
-//    @Scheduled(fixedRate = 5000)
-//    @Transactional
-//    public void processPendingOrders() {
-//
-//        List<LimitOrder> pendingOrders =
-//                orderRepo.findByStatus(OrderStatus.PENDING);
-//
-//        for (LimitOrder order : pendingOrders) {
-//
-//            //  Idempotency guard
-//            if (order.getStatus() != OrderStatus.PENDING) {
-//                continue;
-//            }
-//
-//            Stock stock = stockRepo.findById(order.getStockSymbol())
-//                    .orElse(null);
-//
-//            if (stock == null) {
-//                order.setStatus(OrderStatus.CANCELLED);
-//                orderRepo.save(order);
-//                continue;
-//            }
-//
-//            BigDecimal currentPrice = stock.getCurrentprice();
-//
-//            boolean shouldExecute = false;
-//
-//            if (order.getType() == TransactionType.BUY &&
-//                    currentPrice.compareTo(order.getPrice()) <= 0) {
-//                shouldExecute = true;
-//            }
-//
-//            if (order.getType() == TransactionType.SELL &&
-//                    currentPrice.compareTo(order.getPrice()) >= 0) {
-//                shouldExecute = true;
-//            }
-//
-//            if (shouldExecute) {
-//                executeOrder(order);
-//            }
-//        }
-//    }
     @Transactional
     protected void executeOrder(LimitOrder order) {
-
-
         if (order.getStatus() != OrderStatus.PENDING) {
             return;
         }
 
         try {
-
             if (order.getType() == TransactionType.BUY) {
-
                 transactionService.buyStock(
                         order.getUsername(),
                         order.getStockSymbol(),
                         order.getQuantity()
                 );
-
             } else {
-
                 User user = userRepo.findByUsername(order.getUsername());
-
                 if (user == null) {
                     order.setStatus(OrderStatus.CANCELLED);
                     orderRepo.save(order);
                     return;
                 }
-
                 transactionService.sellStock(
                         user.getUserId(),
                         order.getStockSymbol(),
                         order.getQuantity()
                 );
             }
-
             order.setStatus(OrderStatus.EXECUTED);
-
         } catch (Exception e) {
-
-            // Prevent stuck PENDING orders
             order.setStatus(OrderStatus.CANCELLED);
         }
-
         orderRepo.save(order);
     }
 
     @Transactional
     public void cancelOrder(Long orderId, String username) {
-
         LimitOrder order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
@@ -154,7 +104,6 @@ public class LimitOrderService {
         orderRepo.save(order);
     }
 
-
     public List<LimitOrder> getOrderBook(String symbol) {
         return orderRepo.findByStockSymbolAndStatus(
                 symbol,
@@ -162,19 +111,30 @@ public class LimitOrderService {
         );
     }
 
-    @Scheduled(fixedRate = 3000)
+    // FIXED: Added lock to prevent multiple instances from running simultaneously
+    @Scheduled(fixedRate = 100000) //  100 seconds)
     @Transactional
     public void processOrderBook() {
+        // Only one instance can execute this at a time
+        if (!PROCESS_LOCK.tryLock()) {
+            System.out.println("Another instance is processing order book, skipping...");
+            return;
+        }
 
-        List<String> symbols = orderRepo.findDistinctSymbols();
+        try {
+            List<String> symbols = orderRepo.findDistinctSymbols();
+            System.out.println("Processing order book for " + symbols.size() + " symbols");
 
-        for (String symbol : symbols) {
-            matchOrders(symbol);
+            for (String symbol : symbols) {
+                matchOrders(symbol);
+            }
+        } finally {
+            PROCESS_LOCK.unlock();
         }
     }
+
     @Transactional
     public void matchOrders(String symbol) {
-
         List<LimitOrder> buyOrders =
                 orderRepo.findByStockSymbolAndTypeAndStatusOrderByPriceDescCreatedAtAsc(
                         symbol, TransactionType.BUY, OrderStatus.PENDING
@@ -188,7 +148,6 @@ public class LimitOrderService {
         int i = 0, j = 0;
 
         while (i < buyOrders.size() && j < sellOrders.size()) {
-
             LimitOrder buy = buyOrders.get(i);
             LimitOrder sell = sellOrders.get(j);
 
@@ -237,13 +196,13 @@ public class LimitOrderService {
             orderRepo.save(sell);
         }
 
-        //  ADD THIS BLOCK AT END
-
+        // Broadcast order book update
         List<LimitOrder> remainingOrders =
                 orderRepo.findByStockSymbolAndStatus(
                         symbol,
                         OrderStatus.PENDING
                 );
+
         List<Map<String, Object>> bids = remainingOrders.stream()
                 .filter(o -> o.getType() == TransactionType.BUY)
                 .sorted((a, b) -> b.getPrice().compareTo(a.getPrice()))
@@ -275,6 +234,4 @@ public class LimitOrderService {
                 payload
         );
     }
-
-
 }
