@@ -150,11 +150,17 @@ public class StockPriceController {
 
         String url = String.format(
                 "https://api.twelvedata.com/time_series?symbol=%s&interval=%s&outputsize=%d&apikey=%s",
-                stocksymbol, interval, outputSize, API_key
+                stocksymbol,
+                interval,
+                outputSize,
+                API_key
         );
 
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            ResponseEntity<Map> response =
+                    restTemplate.getForEntity(url, Map.class);
+
             Map<String, Object> body = response.getBody();
 
             if (body != null && body.containsKey("values")) {
@@ -173,7 +179,6 @@ public class StockPriceController {
                     double changePercent = (change / prevClose) * 100;
                     String trend = change >= 0 ? "up" : "down";
 
-                    // Build OHLC data
                     List<Map<String, ? extends Serializable>> ohlcData =
                             values.stream()
                                     .map(v -> Map.of(
@@ -188,31 +193,20 @@ public class StockPriceController {
                                     ))
                                     .collect(Collectors.toList());
 
+                    // Extract company name from meta (NO second API call)
+                    String companyname = stocksymbol;
 
-                    String companyname = stocksymbol; // fallback
+                    if (body.containsKey("meta")) {
+                        Map<String, Object> meta =
+                                (Map<String, Object>) body.get("meta");
 
-                    try {
-                        String quoteUrl = String.format(
-                                "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
-                                stocksymbol, API_key
-                        );
-
-                        ResponseEntity<Map> quoteResponse =
-                                restTemplate.getForEntity(quoteUrl, Map.class);
-
-                        Map<String, Object> quoteBody = quoteResponse.getBody();
-
-                        if (quoteBody != null && quoteBody.get("name") != null) {
-                            companyname = (String) quoteBody.get("name");
+                        if (meta.get("symbol") != null) {
+                            companyname = meta.get("symbol").toString();
                         }
-
-                    } catch (Exception ex) {
-                        // Silent fallback — DO NOT break production
-                        companyname = stocksymbol;
                     }
 
-                    // Final response
                     Map<String, Object> result = new HashMap<>();
+
                     result.put("meta", Map.of(
                             "symbol", stocksymbol,
                             "companyname", companyname,
@@ -237,44 +231,89 @@ public class StockPriceController {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "Failed to get closing price"));
     }
+
+    private Map<String, Object> extractQuote(Map<String, Object> body) {
+
+        Map<String, Object> stockData = new HashMap<>();
+
+        stockData.put("stocksymbol", body.get("symbol"));
+        stockData.put("companyname", body.get("name"));
+
+        try {
+            double close = Double.parseDouble(body.get("close").toString());
+            double change = Double.parseDouble(body.get("change").toString());
+            double percentChange = Double.parseDouble(body.get("percent_change").toString());
+
+            stockData.put("price", close);
+            stockData.put("change", change);
+            stockData.put("percentChange", percentChange);
+        } catch (Exception e) {
+            stockData.put("price", 0);
+            stockData.put("change", 0);
+            stockData.put("percentChange", 0);
+        }
+
+        return stockData;
+    }
+
     @GetMapping("/batch-live")
     public ResponseEntity<?> getBatchLive(@RequestParam List<String> symbols) {
 
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (String symbol : symbols) {
-            try {
-                String url = String.format(
-                        "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
-                        symbol, API_key
-                );
-
-                ResponseEntity<Map> response =
-                        restTemplate.getForEntity(url, Map.class);
-
-                Map<String, Object> body = response.getBody();
-
-                if (body != null && body.get("close") != null) {
-
-                    double close = Double.parseDouble(body.get("close").toString());
-                    double change = Double.parseDouble(body.get("change").toString());
-                    double percentChange = Double.parseDouble(body.get("percent_change").toString());
-
-                    Map<String, Object> stockData = new HashMap<>();
-                    stockData.put("stocksymbol", body.get("symbol"));
-                    stockData.put("companyname", body.get("name"));
-                    stockData.put("price", close);
-                    stockData.put("change", change);
-                    stockData.put("percentChange", percentChange);
-
-                    result.add(stockData);
-                }
-
-            } catch (Exception e) {
-                System.out.println("Error fetching: " + symbol);
-            }
+        if (symbols == null || symbols.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
         }
 
-        return ResponseEntity.ok(result);
+        try {
+
+            // Normalize symbols
+            List<String> cleanSymbols = symbols.stream()
+                    .map(s -> s.trim().toUpperCase())
+                    .filter(s -> s.matches("^[A-Z]{1,5}$"))
+                    .collect(Collectors.toList());
+
+            if (cleanSymbols.isEmpty()) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+
+            // Join into single API call
+            String joinedSymbols = String.join(",", cleanSymbols);
+
+            String url = String.format(
+                    "https://api.twelvedata.com/quote?symbol=%s&apikey=%s",
+                    joinedSymbols,
+                    API_key
+            );
+
+            ResponseEntity<Map> response =
+                    restTemplate.getForEntity(url, Map.class);
+
+            Map<String, Object> body = response.getBody();
+
+            if (body == null) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+
+            List<Map<String, Object>> result = new ArrayList<>();
+
+
+            if (body.containsKey("symbol")) {
+                // Single symbol case
+                result.add(extractQuote(body));
+            } else {
+                // Multiple symbols case
+                for (String key : body.keySet()) {
+                    Object value = body.get(key);
+                    if (value instanceof Map) {
+                        result.add(extractQuote((Map<String, Object>) value));
+                    }
+                }
+            }
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
     }
+
 }

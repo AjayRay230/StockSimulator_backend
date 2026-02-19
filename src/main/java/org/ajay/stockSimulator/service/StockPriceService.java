@@ -10,9 +10,7 @@ import java.util.List;
 public class StockPriceService {
     @Autowired
     private StockPriceRepo stockPriceRepo;
-//    public List<StockPrice> getPricesBySymbol(String symbol) {
-//        return stockPriceRepo.findBySymbolOrderByTimestampAsc(symbol);
-//    }
+
     public void savePrice(StockPrice stockPrice) {
         stockPriceRepo.save(stockPrice);
     }
