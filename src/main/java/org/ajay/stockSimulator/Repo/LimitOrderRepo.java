@@ -6,6 +6,7 @@ import org.ajay.stockSimulator.model.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface LimitOrderRepo
@@ -33,4 +34,6 @@ public interface LimitOrderRepo
 
     @Query("SELECT DISTINCT l.stockSymbol FROM LimitOrder l")
     List<String> findDistinctSymbols();
+
+    long countByUsernameAndStatusInAndCreatedAtBetween(String username, List<OrderStatus> executed, LocalDateTime start, LocalDateTime end);
 }

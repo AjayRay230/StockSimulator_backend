@@ -1,7 +1,6 @@
 package org.ajay.stockSimulator.Repo;
 
 import org.ajay.stockSimulator.model.PortfolioItem;
-import org.ajay.stockSimulator.model.Stock;
 import org.ajay.stockSimulator.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -9,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface PortfolioItemRepo extends JpaRepository<PortfolioItem,Long> {
@@ -33,4 +33,9 @@ public interface PortfolioItemRepo extends JpaRepository<PortfolioItem,Long> {
 
     @Query("SELECT DISTINCT p.user FROM PortfolioItem p")
     List<User> findDistinctUsersWithPortfolio();
+
+    Optional<PortfolioItem> findByUserAndStocksymbol(
+            User user,
+            String stocksymbol
+    );
 }

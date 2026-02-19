@@ -1,22 +1,25 @@
 package org.ajay.stockSimulator.service;
 
+import org.ajay.stockSimulator.DTOs.DashboardMetricsDTO;
 import org.ajay.stockSimulator.DTOs.PortfolioItemDTO;
 
 
 import org.ajay.stockSimulator.DTOs.PortfolioItemDtos;
 import org.ajay.stockSimulator.DTOs.StockDto;
-import org.ajay.stockSimulator.Repo.PortfolioItemRepo;
-import org.ajay.stockSimulator.Repo.StockRepo;
-import org.ajay.stockSimulator.Repo.TransactionRepo;
-import org.ajay.stockSimulator.Repo.UserRepo;
+import org.ajay.stockSimulator.Repo.*;
+import org.ajay.stockSimulator.model.OrderStatus;
 import org.ajay.stockSimulator.model.PortfolioItem;
+import org.ajay.stockSimulator.model.Stock;
 import org.ajay.stockSimulator.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
-import java.util.stream.Collectors;
+
 
 @Service
 
@@ -30,7 +33,8 @@ public class PortfolioItemService {
    private UserRepo userRepo;
     @Autowired
     private StockRepo stockRepo;
-
+ @Autowired
+ private LimitOrderRepo limitOrderRepo;
     public List<PortfolioItemDtos> getAllPortfolioItemById(Long userId) {
         List<PortfolioItem> items = portfolioItemRepo.findAllByUserIdWithStock(userId);
 
@@ -116,7 +120,65 @@ public class PortfolioItemService {
         return total;
     }
 
-    public List<User> findUsersWithPortfolio() {
-        return portfolioItemRepo.findDistinctUsersWithPortfolio();
+    public DashboardMetricsDTO getDashboardMetrics(User user, String symbol) {
+
+        //  Fetch portfolio item
+        PortfolioItem portfolio =
+                (PortfolioItem) portfolioItemRepo
+                        .findByUserAndStocksymbol(user, symbol)
+                        .orElse(null);
+
+        int quantity = 0;
+        BigDecimal avgBuyPrice = BigDecimal.ZERO;
+
+        if (portfolio != null) {
+            quantity = portfolio.getQuantity();
+            avgBuyPrice = portfolio.getAveragebuyprice();
+        }
+
+        //  Fetch stock price from DB
+        Stock stock = stockRepo.findById(symbol)
+                .orElseThrow(() -> new RuntimeException("Stock not found"));
+
+        BigDecimal currentPrice =
+                BigDecimal.valueOf(stock.getCurrentprice().doubleValue());
+
+        //  Calculate Unrealized PnL safely
+        BigDecimal unrealizedPnL = BigDecimal.ZERO;
+
+        if (quantity > 0) {
+            unrealizedPnL = currentPrice
+                    .subtract(avgBuyPrice)
+                    .multiply(BigDecimal.valueOf(quantity));
+        }
+
+        //  Total portfolio value (you already implemented this)
+        double totalPortfolioValue =
+                calculateTotalPortfolioValue(user);
+
+        // Trades Today using LimitOrder
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.atTime(LocalTime.MAX);
+
+        long tradesToday =
+                limitOrderRepo
+                        .countByUsernameAndStatusInAndCreatedAtBetween(
+                                user.getUsername(),
+                                List.of(OrderStatus.EXECUTED, OrderStatus.PARTIAL),
+                                start,
+                                end
+                        );
+
+        return new DashboardMetricsDTO(
+                symbol,
+                quantity,
+                avgBuyPrice.doubleValue(),
+                currentPrice.doubleValue(),
+                unrealizedPnL.doubleValue(),
+                totalPortfolioValue,
+                tradesToday
+        );
     }
+
 }
