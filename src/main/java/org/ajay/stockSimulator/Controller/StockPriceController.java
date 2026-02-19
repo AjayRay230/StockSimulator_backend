@@ -123,140 +123,126 @@ public class StockPriceController {
             @RequestParam String stocksymbol,
             @RequestParam(required = false, defaultValue = "1D") String range) {
 
-        String interval;
-        int outputSize;
-
-        switch (range) {
-            case "5D":
-                interval = "5min";
-                outputSize = 300;
-                break;
-            case "1M":
-                interval = "1day";
-                outputSize = 30;
-                break;
-            case "1Y":
-                interval = "1week";
-                outputSize = 52;
-                break;
-            case "MAX":
-                interval = "1month";
-                outputSize = 120;
-                break;
-            case "1D":
-            default:
-                interval = "1min";
-                outputSize = 390;
-                break;
-        }
-
-        String url = String.format(
-                "https://api.twelvedata.com/time_series?symbol=%s&interval=%s&outputsize=%d&apikey=%s",
-                stocksymbol,
-                interval,
-                outputSize,
-                API_key
-        );
-
         try {
+
+            String interval;
+            int outputSize;
+
+            switch (range) {
+                case "5D" -> { interval = "5min"; outputSize = 300; }
+                case "1M" -> { interval = "1day"; outputSize = 30; }
+                case "1Y" -> { interval = "1week"; outputSize = 52; }
+                case "MAX" -> { interval = "1month"; outputSize = 120; }
+                default -> { interval = "1min"; outputSize = 390; }
+            }
+
+            String url = String.format(
+                    "https://api.twelvedata.com/time_series?symbol=%s&interval=%s&outputsize=%d&apikey=%s",
+                    stocksymbol, interval, outputSize, API_key
+            );
 
             ResponseEntity<Map> response =
                     restTemplate.getForEntity(url, Map.class);
 
             Map<String, Object> body = response.getBody();
 
-            if (body != null && body.containsKey("values")) {
-
-                List<Map<String, String>> values =
-                        (List<Map<String, String>>) body.get("values");
-
-                if (values.size() >= 2) {
-
-                    Map<String, String> latest = values.get(0);
-                    Map<String, String> prev = values.get(1);
-
-                    double close = Double.parseDouble(latest.get("close"));
-                    double prevClose = Double.parseDouble(prev.get("close"));
-                    double change = close - prevClose;
-                    double changePercent = (change / prevClose) * 100;
-                    String trend = change >= 0 ? "up" : "down";
-
-                    List<Map<String, ? extends Serializable>> ohlcData =
-                            values.stream()
-                                    .map(v -> Map.of(
-                                            "timestamp", v.get("datetime"),
-                                            "openPrice", Double.parseDouble(v.get("open")),
-                                            "highPrice", Double.parseDouble(v.get("high")),
-                                            "lowPrice", Double.parseDouble(v.get("low")),
-                                            "closePrice", Double.parseDouble(v.get("close")),
-                                            "volume", v.containsKey("volume")
-                                                    ? Double.parseDouble(v.get("volume"))
-                                                    : 0.0
-                                    ))
-                                    .collect(Collectors.toList());
-
-                    // Extract company name from meta (NO second API call)
-                    String companyname = stocksymbol;
-
-                    if (body.containsKey("meta")) {
-                        Map<String, Object> meta =
-                                (Map<String, Object>) body.get("meta");
-
-                        if (meta.get("symbol") != null) {
-                            companyname = meta.get("symbol").toString();
-                        }
-                    }
-
-                    Map<String, Object> result = new HashMap<>();
-
-                    result.put("meta", Map.of(
-                            "symbol", stocksymbol,
-                            "companyname", companyname,
-                            "currentPrice", close,
-                            "change", change,
-                            "changePercent", changePercent,
-                            "timestamp", latest.get("datetime"),
-                            "trend", trend
-                    ));
-
-                    result.put("data", ohlcData);
-
-                    return ResponseEntity.ok(result);
-                }
+            //  Handle API limit / error response safely
+            if (body == null || !body.containsKey("values")) {
+                return ResponseEntity.ok(Map.of(
+                        "meta", Map.of(
+                                "symbol", stocksymbol,
+                                "companyname", stocksymbol,
+                                "currentPrice", 0,
+                                "change", 0,
+                                "changePercent", 0,
+                                "trend", "neutral"
+                        ),
+                        "data", List.of()
+                ));
             }
 
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Exception: " + e.getMessage()));
-        }
+            List<Map<String, String>> values =
+                    (List<Map<String, String>>) body.get("values");
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "Failed to get closing price"));
+            if (values.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "meta", Map.of(
+                                "symbol", stocksymbol,
+                                "companyname", stocksymbol,
+                                "currentPrice", 0,
+                                "change", 0,
+                                "changePercent", 0,
+                                "trend", "neutral"
+                        ),
+                        "data", List.of()
+                ));
+            }
+
+            Map<String, String> latest = values.get(0);
+            Map<String, String> prev =
+                    values.size() > 1 ? values.get(1) : latest;
+
+            double close = Double.parseDouble(latest.get("close"));
+            double prevClose = Double.parseDouble(prev.get("close"));
+
+            double change = close - prevClose;
+            double changePercent = prevClose != 0
+                    ? (change / prevClose) * 100
+                    : 0;
+
+            String trend = change >= 0 ? "up" : "down";
+
+            List<Map<String, Object>> ohlcData =
+                    values.stream()
+                            .map(v -> {
+                                Map<String, Object> map = new HashMap<>();
+                                map.put("timestamp", v.get("datetime"));
+                                map.put("openPrice", Double.parseDouble(v.get("open")));
+                                map.put("highPrice", Double.parseDouble(v.get("high")));
+                                map.put("lowPrice", Double.parseDouble(v.get("low")));
+                                map.put("closePrice", Double.parseDouble(v.get("close")));
+                                map.put("volume",
+                                        v.containsKey("volume")
+                                                ? Double.parseDouble(v.get("volume"))
+                                                : 0.0);
+                                return map;
+                            })
+                            .collect(Collectors.toList());
+
+
+            Map<String, Object> result = new HashMap<>();
+
+            result.put("meta", Map.of(
+                    "symbol", stocksymbol,
+                    "companyname", stocksymbol,
+                    "currentPrice", close,
+                    "change", change,
+                    "changePercent", changePercent,
+                    "timestamp", latest.get("datetime"),
+                    "trend", trend
+            ));
+
+            result.put("data", ohlcData);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+
+            //  NEVER RETURN 400 HERE
+            return ResponseEntity.ok(Map.of(
+                    "meta", Map.of(
+                            "symbol", stocksymbol,
+                            "companyname", stocksymbol,
+                            "currentPrice", 0,
+                            "change", 0,
+                            "changePercent", 0,
+                            "trend", "neutral"
+                    ),
+                    "data", List.of()
+            ));
+        }
     }
 
-//    private Map<String, Object> extractQuote(Map<String, Object> body) {
-//
-//        Map<String, Object> stockData = new HashMap<>();
-//
-//        stockData.put("stocksymbol", body.get("symbol"));
-//        stockData.put("companyname", body.get("name"));
-//
-//        try {
-//            double close = Double.parseDouble(body.get("close").toString());
-//            double change = Double.parseDouble(body.get("change").toString());
-//            double percentChange = Double.parseDouble(body.get("percent_change").toString());
-//
-//            stockData.put("price", close);
-//            stockData.put("change", change);
-//            stockData.put("percentChange", percentChange);
-//        } catch (Exception e) {
-//            stockData.put("price", 0);
-//            stockData.put("change", 0);
-//            stockData.put("percentChange", 0);
-//        }
-//
-//        return stockData;
-//    }
 
     @GetMapping("/batch-live")
     public ResponseEntity<?> getBatchLive(@RequestParam List<String> symbols) {
