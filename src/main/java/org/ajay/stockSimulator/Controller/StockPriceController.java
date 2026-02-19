@@ -6,6 +6,7 @@ import org.ajay.stockSimulator.service.StockPriceService;
 import org.ajay.stockSimulator.service.TwelveDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -118,10 +119,29 @@ public class StockPriceController {
         return ResponseEntity.badRequest().body(List.of(Map.of("error", "No candle data")));
     }
 
+    private Map<String, Object> buildEmptyResponse(String symbol) {
+        return Map.of(
+                "meta", Map.of(
+                        "symbol", symbol,
+                        "companyname", symbol,
+                        "currentPrice", 0,
+                        "change", 0,
+                        "changePercent", 0,
+                        "trend", "neutral"
+                ),
+                "data", List.of()
+        );
+    }
+
+
+    @Cacheable(
+            value = "closingPrice",
+            key = "#stocksymbol + '_' + #range"
+    )
     @GetMapping("/closing-price")
-    public ResponseEntity<Map<String, Object>> getClosingPrice(
+    public Map<String, Object> getClosingPrice(
             @RequestParam String stocksymbol,
-            @RequestParam(required = false, defaultValue = "1D") String range) {
+            @RequestParam(defaultValue = "1D") String range) {
 
         try {
 
@@ -138,7 +158,10 @@ public class StockPriceController {
 
             String url = String.format(
                     "https://api.twelvedata.com/time_series?symbol=%s&interval=%s&outputsize=%d&apikey=%s",
-                    stocksymbol, interval, outputSize, API_key
+                    stocksymbol,
+                    interval,
+                    outputSize,
+                    API_key
             );
 
             ResponseEntity<Map> response =
@@ -146,36 +169,15 @@ public class StockPriceController {
 
             Map<String, Object> body = response.getBody();
 
-            //  Handle API limit / error response safely
             if (body == null || !body.containsKey("values")) {
-                return ResponseEntity.ok(Map.of(
-                        "meta", Map.of(
-                                "symbol", stocksymbol,
-                                "companyname", stocksymbol,
-                                "currentPrice", 0,
-                                "change", 0,
-                                "changePercent", 0,
-                                "trend", "neutral"
-                        ),
-                        "data", List.of()
-                ));
+                return buildEmptyResponse(stocksymbol);
             }
 
             List<Map<String, String>> values =
                     (List<Map<String, String>>) body.get("values");
 
             if (values.isEmpty()) {
-                return ResponseEntity.ok(Map.of(
-                        "meta", Map.of(
-                                "symbol", stocksymbol,
-                                "companyname", stocksymbol,
-                                "currentPrice", 0,
-                                "change", 0,
-                                "changePercent", 0,
-                                "trend", "neutral"
-                        ),
-                        "data", List.of()
-                ));
+                return buildEmptyResponse(stocksymbol);
             }
 
             Map<String, String> latest = values.get(0);
@@ -186,9 +188,8 @@ public class StockPriceController {
             double prevClose = Double.parseDouble(prev.get("close"));
 
             double change = close - prevClose;
-            double changePercent = prevClose != 0
-                    ? (change / prevClose) * 100
-                    : 0;
+            double changePercent =
+                    prevClose != 0 ? (change / prevClose) * 100 : 0;
 
             String trend = change >= 0 ? "up" : "down";
 
@@ -210,38 +211,24 @@ public class StockPriceController {
                             .collect(Collectors.toList());
 
 
-            Map<String, Object> result = new HashMap<>();
-
-            result.put("meta", Map.of(
-                    "symbol", stocksymbol,
-                    "companyname", stocksymbol,
-                    "currentPrice", close,
-                    "change", change,
-                    "changePercent", changePercent,
-                    "timestamp", latest.get("datetime"),
-                    "trend", trend
-            ));
-
-            result.put("data", ohlcData);
-
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-
-            //  NEVER RETURN 400 HERE
-            return ResponseEntity.ok(Map.of(
+            return Map.of(
                     "meta", Map.of(
                             "symbol", stocksymbol,
                             "companyname", stocksymbol,
-                            "currentPrice", 0,
-                            "change", 0,
-                            "changePercent", 0,
-                            "trend", "neutral"
+                            "currentPrice", close,
+                            "change", change,
+                            "changePercent", changePercent,
+                            "timestamp", latest.get("datetime"),
+                            "trend", trend
                     ),
-                    "data", List.of()
-            ));
+                    "data", ohlcData
+            );
+
+        } catch (Exception e) {
+            return buildEmptyResponse(stocksymbol);
         }
     }
+
 
 
     @GetMapping("/batch-live")
