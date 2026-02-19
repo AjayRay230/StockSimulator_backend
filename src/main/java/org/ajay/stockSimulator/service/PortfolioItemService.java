@@ -113,8 +113,15 @@ public class PortfolioItemService {
         double total = 0.0;
 
         for (PortfolioItem holding : holdings) {
+
+            Stock stock = holding.getStock();
+
+            if (stock == null || stock.getCurrentprice() == null) {
+                continue; // skip if no live price yet
+            }
+
             total += holding.getQuantity()
-                    * holding.getStock().getCurrentprice().doubleValue();
+                    * stock.getCurrentprice().doubleValue();
         }
 
         return total;
@@ -122,9 +129,8 @@ public class PortfolioItemService {
 
     public DashboardMetricsDTO getDashboardMetrics(User user, String symbol) {
 
-        //  Fetch portfolio item
         PortfolioItem portfolio =
-                (PortfolioItem) portfolioItemRepo
+                portfolioItemRepo
                         .findByUserAndStocksymbol(user, symbol)
                         .orElse(null);
 
@@ -136,14 +142,14 @@ public class PortfolioItemService {
             avgBuyPrice = portfolio.getAveragebuyprice();
         }
 
-        //  Fetch stock price from DB
         Stock stock = stockRepo.findById(symbol)
                 .orElseThrow(() -> new RuntimeException("Stock not found"));
 
         BigDecimal currentPrice =
-                BigDecimal.valueOf(stock.getCurrentprice().doubleValue());
+                stock.getCurrentprice() != null
+                        ? stock.getCurrentprice()
+                        : BigDecimal.ZERO;
 
-        //  Calculate Unrealized PnL safely
         BigDecimal unrealizedPnL = BigDecimal.ZERO;
 
         if (quantity > 0) {
@@ -152,11 +158,9 @@ public class PortfolioItemService {
                     .multiply(BigDecimal.valueOf(quantity));
         }
 
-        //  Total portfolio value (you already implemented this)
         double totalPortfolioValue =
                 calculateTotalPortfolioValue(user);
 
-        // Trades Today using LimitOrder
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.atTime(LocalTime.MAX);
@@ -180,6 +184,7 @@ public class PortfolioItemService {
                 tradesToday
         );
     }
+
     public List<User> findUsersWithPortfolio() {
         return portfolioItemRepo.findDistinctUsersWithPortfolio();
     }
