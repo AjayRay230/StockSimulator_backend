@@ -35,6 +35,8 @@ public class PortfolioItemService {
     private StockRepo stockRepo;
  @Autowired
  private LimitOrderRepo limitOrderRepo;
+  @Autowired
+  private TwelveDataService twelveDataService;
     public List<PortfolioItemDtos> getAllPortfolioItemById(Long userId) {
         List<PortfolioItem> items = portfolioItemRepo.findAllByUserIdWithStock(userId);
 
@@ -173,6 +175,8 @@ public class PortfolioItemService {
                                 start,
                                 end
                         );
+        BigDecimal marketCap =
+                twelveDataService.fetchMarketCap(symbol);
 
         return new DashboardMetricsDTO(
                 symbol,
@@ -181,7 +185,8 @@ public class PortfolioItemService {
                 currentPrice.doubleValue(),
                 unrealizedPnL.doubleValue(),
                 totalPortfolioValue,
-                tradesToday
+                tradesToday,
+                marketCap.doubleValue()
         );
     }
 

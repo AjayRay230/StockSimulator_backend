@@ -10,7 +10,7 @@ public class DashboardMetricsDTO {
     private double unrealizedPnL;
     private double portfolioValue;
     private long tradesToday;
-
+    private double marketCap;
     public DashboardMetricsDTO(
             String symbol,
             int quantity,
@@ -18,7 +18,8 @@ public class DashboardMetricsDTO {
             double currentPrice,
             double unrealizedPnL,
             double portfolioValue,
-            long tradesToday) {
+            long tradesToday,
+            double marketCap) {
 
         this.symbol = symbol;
         this.quantity = quantity;
@@ -27,8 +28,8 @@ public class DashboardMetricsDTO {
         this.unrealizedPnL = unrealizedPnL;
         this.portfolioValue = portfolioValue;
         this.tradesToday = tradesToday;
+        this.marketCap = marketCap;
     }
-
     public String getSymbol() { return symbol; }
     public int getQuantity() { return quantity; }
     public double getAvgBuyPrice() { return avgBuyPrice; }
@@ -36,5 +37,8 @@ public class DashboardMetricsDTO {
     public double getUnrealizedPnL() { return unrealizedPnL; }
     public double getPortfolioValue() { return portfolioValue; }
     public long getTradesToday() { return tradesToday; }
+    public double getMarketCap() {
+        return marketCap;
+    }
 }
 

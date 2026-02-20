@@ -2,6 +2,8 @@ package org.ajay.stockSimulator.service;
 
 import org.ajay.stockSimulator.model.Stock;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -133,6 +135,34 @@ public class TwelveDataService {
             return new BigDecimal(response.get("price").toString());
         } catch (Exception e) {
             return null;
+        }
+    }
+
+
+    @Cacheable(value = "marketCap", key = "#symbol")
+    public BigDecimal fetchMarketCap(String symbol) {
+
+        String url = "https://api.twelvedata.com/statistics?symbol="
+                + symbol + "&apikey=" + apiKey;
+
+        ResponseEntity<Map> response =
+                restTemplate.getForEntity(url, Map.class);
+
+        Map<String, Object> body = response.getBody();
+
+        if (body == null || !body.containsKey("statistics"))
+            return BigDecimal.ZERO;
+
+        Map<String, Object> stats =
+                (Map<String, Object>) body.get("statistics");
+
+        if (!stats.containsKey("market_cap"))
+            return BigDecimal.ZERO;
+
+        try {
+            return new BigDecimal(stats.get("market_cap").toString());
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
         }
     }
 }
