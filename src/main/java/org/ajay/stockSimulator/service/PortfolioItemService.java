@@ -175,8 +175,14 @@ public class PortfolioItemService {
                                 start,
                                 end
                         );
+
+        BigDecimal shares =
+                stock.getSharesOutstanding() != null
+                        ? stock.getSharesOutstanding()
+                        : BigDecimal.ZERO;
+
         BigDecimal marketCap =
-                twelveDataService.fetchMarketCap(symbol);
+                currentPrice.multiply(shares);
 
         return new DashboardMetricsDTO(
                 symbol,

@@ -31,7 +31,7 @@ public class MarketUpdateScheduler {
 
     private static final int BATCH_SIZE = 5; // safe limit
 
-    @Scheduled(fixedRate = 600000) // 10 minutes
+    @Scheduled(fixedRate = 900000) // 10 minutes
     public void updateMarketPrices() {
 
         List<Stock> stocks = stockRepo.findAll();
@@ -69,5 +69,24 @@ public class MarketUpdateScheduler {
         rotationIndex = end >= stocks.size() ? 0 : end;
 
         System.out.println("Updated batch: " + start + " → " + end);
+    }
+
+    @Scheduled(cron = "0 0 3 * * ?") // 3 AM daily
+    public void updateFundamentals() {
+
+        List<Stock> stocks = stockRepo.findAll();
+
+        for (Stock stock : stocks) {
+
+            BigDecimal shares =
+                    twelveDataService.fetchSharesOutstanding(stock.getSymbol());
+
+            if (shares != null && shares.compareTo(BigDecimal.ZERO) > 0) {
+                stock.setSharesOutstanding(shares);
+                stockRepo.save(stock);
+            }
+        }
+
+        System.out.println("Fundamentals updated.");
     }
 }

@@ -139,8 +139,7 @@ public class TwelveDataService {
     }
 
 
-    @Cacheable(value = "marketCap", key = "#symbol")
-    public BigDecimal fetchMarketCap(String symbol) {
+    public BigDecimal fetchSharesOutstanding(String symbol) {
 
         String url = "https://api.twelvedata.com/statistics?symbol="
                 + symbol + "&apikey=" + apiKey;
@@ -150,19 +149,23 @@ public class TwelveDataService {
 
         Map<String, Object> body = response.getBody();
 
-        if (body == null || !body.containsKey("statistics"))
-            return BigDecimal.ZERO;
+        if (body == null) return null;
 
-        Map<String, Object> stats =
-                (Map<String, Object>) body.get("statistics");
-
-        if (!stats.containsKey("market_cap"))
-            return BigDecimal.ZERO;
-
-        try {
-            return new BigDecimal(stats.get("market_cap").toString());
-        } catch (Exception e) {
-            return BigDecimal.ZERO;
+        // TwelveData sometimes returns flat response
+        if (body.containsKey("shares_outstanding")) {
+            return new BigDecimal(body.get("shares_outstanding").toString());
         }
+
+        // Sometimes nested under statistics
+        if (body.containsKey("statistics")) {
+            Map<String, Object> stats =
+                    (Map<String, Object>) body.get("statistics");
+
+            if (stats.containsKey("shares_outstanding")) {
+                return new BigDecimal(stats.get("shares_outstanding").toString());
+            }
+        }
+
+        return null;
     }
 }

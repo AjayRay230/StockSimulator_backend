@@ -27,4 +27,6 @@ public class Stock implements Serializable {
     private BigDecimal changepercent;
 
     private LocalDateTime lastupdate;
+    @Column(name = "shares_outstanding")
+    private BigDecimal sharesOutstanding;
 }
