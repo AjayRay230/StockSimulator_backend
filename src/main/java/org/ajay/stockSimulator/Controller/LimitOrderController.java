@@ -4,6 +4,7 @@ import org.ajay.stockSimulator.service.LimitOrderService;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -18,14 +19,15 @@ public class LimitOrderController {
 
     @PostMapping
     public LimitOrder placeOrder(
-            @RequestParam String username,
             @RequestParam String stockSymbol,
             @RequestParam Integer quantity,
             @RequestParam BigDecimal targetPrice,
-            @RequestParam TransactionType type
+            @RequestParam TransactionType type,
+            Principal principal
     ) {
+
         return service.placeLimitOrder(
-                username,
+                principal.getName(),  // secure username
                 stockSymbol,
                 quantity,
                 targetPrice,

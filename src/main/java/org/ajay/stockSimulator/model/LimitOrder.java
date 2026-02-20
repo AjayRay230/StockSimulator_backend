@@ -23,9 +23,9 @@ public class LimitOrder {
 
     private Integer quantity; // original quantity
 
-    private Integer remainingQuantity; //  NEW
+    private Integer remainingQuantity;
 
-    private BigDecimal price; // rename targetPrice → price
+    private BigDecimal price;
 
     @Enumerated(EnumType.STRING)
     private TransactionType type; // BUY or SELL
